@@ -21,8 +21,8 @@ type HookData struct {
 	Metadata      map[string]interface{}
 }
 
-// ManagerOption is a functional option for configuring the hook manager
-type ManagerOption func(*Manager)
+// Option is a functional option for configuring the hook manager
+type Option func(*Manager)
 
 // Manager manages builtin, external, and Rego hooks for the tykctl-go SDK
 type Manager struct {
@@ -34,7 +34,7 @@ type Manager struct {
 }
 
 // WithExternalHookDir sets the external hook directory
-func WithExternalHookDir(dir string) ManagerOption {
+func WithExternalHookDir(dir string) Option {
 	return func(m *Manager) {
 		m.externalHookDir = dir
 		m.external = NewExternalManager(dir)
@@ -42,7 +42,7 @@ func WithExternalHookDir(dir string) ManagerOption {
 }
 
 // WithLogger sets the logger for the hook manager
-func WithLogger(logger *zap.Logger) ManagerOption {
+func WithLogger(logger *zap.Logger) Option {
 	return func(m *Manager) {
 		m.logger = logger
 		m.external = NewExternalManagerWithLogger(m.externalHookDir, logger)
@@ -51,7 +51,7 @@ func WithLogger(logger *zap.Logger) ManagerOption {
 }
 
 // New creates a new hook manager with functional options
-func New(opts ...ManagerOption) *Manager {
+func New(opts ...Option) *Manager {
 	m := &Manager{
 		builtin:         NewBuiltinManager(),
 		external:        NewExternalManager(GetDefaultHookDir()),
