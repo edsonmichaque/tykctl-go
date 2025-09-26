@@ -14,22 +14,6 @@ import (
 	yaml "gopkg.in/yaml.v3"
 )
 
-// Info represents information about an extension
-type Info struct {
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Stars       int       `json:"stargazers_count"`
-	UpdatedAt   time.Time `json:"updated_at"`
-}
-
-// Installed represents an installed extension
-type Installed struct {
-	Name        string    `yaml:"name"`
-	Version     string    `yaml:"version"`
-	Repository  string    `yaml:"repository"`
-	InstalledAt time.Time `yaml:"installed_at"`
-	Path        string    `yaml:"path"`
-}
 
 // Manager manages tykctl extensions
 type Manager struct {
