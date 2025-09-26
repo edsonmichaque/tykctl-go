@@ -13,23 +13,6 @@ type Hook func(ctx context.Context, data interface{}) error
 // HookType represents the type of hook
 type HookType string
 
-const (
-	// HookTypeBeforeInstall is executed before installing an extension
-	HookTypeBeforeInstall HookType = "before_install"
-	// HookTypeAfterInstall is executed after installing an extension
-	HookTypeAfterInstall HookType = "after_install"
-	// HookTypeBeforeUninstall is executed before uninstalling an extension
-	HookTypeBeforeUninstall HookType = "before_uninstall"
-	// HookTypeAfterUninstall is executed after uninstalling an extension
-	HookTypeAfterUninstall HookType = "after_uninstall"
-	// HookTypeBeforeRun is executed before running an extension
-	HookTypeBeforeRun HookType = "before_run"
-	// HookTypeAfterRun is executed after running an extension
-	HookTypeAfterRun HookType = "after_run"
-	// HookTypeOnError is executed when an error occurs
-	HookTypeOnError HookType = "on_error"
-)
-
 // HookData contains data passed to hooks
 type HookData struct {
 	ExtensionName string
@@ -38,38 +21,51 @@ type HookData struct {
 	Metadata      map[string]interface{}
 }
 
+// ManagerOption is a functional option for configuring the hook manager
+type ManagerOption func(*Manager)
+
 // Manager manages builtin, external, and Rego hooks for the tykctl-go SDK
 type Manager struct {
-	builtin  *BuiltinManager
-	external *ExternalManager
-	rego     *RegoHookManager
+	builtin        *BuiltinManager
+	external       *ExternalManager
+	rego           *RegoHookManager
+	externalHookDir string
+	logger         *zap.Logger
 }
 
-// New creates a new hook manager
-func New() *Manager {
-	return &Manager{
-		builtin:  NewBuiltinManager(),
-		external: NewExternalManager(GetDefaultHookDir()),
-		rego:     NewRegoHookManager(nil),
+// WithExternalHookDir sets the external hook directory
+func WithExternalHookDir(dir string) ManagerOption {
+	return func(m *Manager) {
+		m.externalHookDir = dir
+		m.external = NewExternalManager(dir)
 	}
 }
 
-// NewWithExternalDir creates a new hook manager with custom external hook directory
-func NewWithExternalDir(externalHookDir string) *Manager {
-	return &Manager{
-		builtin:  NewBuiltinManager(),
-		external: NewExternalManager(externalHookDir),
-		rego:     NewRegoHookManager(nil),
+// WithLogger sets the logger for the hook manager
+func WithLogger(logger *zap.Logger) ManagerOption {
+	return func(m *Manager) {
+		m.logger = logger
+		m.external = NewExternalManagerWithLogger(m.externalHookDir, logger)
+		m.rego = NewRegoHookManager(logger)
 	}
 }
 
-// NewWithLogger creates a new hook manager with custom logger
-func NewWithLogger(externalHookDir string, logger *zap.Logger) *Manager {
-	return &Manager{
-		builtin:  NewBuiltinManager(),
-		external: NewExternalManagerWithLogger(externalHookDir, logger),
-		rego:     NewRegoHookManager(logger),
+// New creates a new hook manager with functional options
+func New(opts ...ManagerOption) *Manager {
+	m := &Manager{
+		builtin:         NewBuiltinManager(),
+		external:        NewExternalManager(GetDefaultHookDir()),
+		rego:            NewRegoHookManager(nil),
+		externalHookDir: GetDefaultHookDir(),
+		logger:          zap.NewNop(), // Default no-op logger
 	}
+
+	// Apply functional options
+	for _, opt := range opts {
+		opt(m)
+	}
+
+	return m
 }
 
 // RegisterBuiltin registers a builtin hook for a specific type
