@@ -14,6 +14,15 @@ import (
 	yaml "gopkg.in/yaml.v3"
 )
 
+// Extension-specific hook types
+const (
+	HookTypeBeforeInstall   hook.HookType = "extension-before-install"
+	HookTypeAfterInstall    hook.HookType = "extension-after-install"
+	HookTypeBeforeUninstall hook.HookType = "extension-before-uninstall"
+	HookTypeAfterUninstall  hook.HookType = "extension-after-uninstall"
+	HookTypeBeforeRun       hook.HookType = "extension-before-run"
+)
+
 // Info represents information about an extension
 type Info struct {
 	Name        string    `json:"name"`

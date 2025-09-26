@@ -55,7 +55,7 @@ func (r *Runner) RunExtension(ctx context.Context, extensionName string, args []
 		},
 	}
 
-	if err := r.hooks.Execute(ctx, hook.HookTypeBeforeRun, hookData); err != nil {
+	if err := r.hooks.Execute(ctx, HookTypeBeforeRun, hookData); err != nil {
 		r.logger.Error("Before run hook failed", zap.Error(err))
 		return fmt.Errorf("before run hook failed: %w", err)
 	}
