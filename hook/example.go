@@ -13,6 +13,14 @@ func Example() {
 	manager := New()
 	ctx := context.Background()
 
+	// Define custom hook types for this example
+	const (
+		HookTypeBeforeInstall HookType = "before-install"
+		HookTypeAfterInstall  HookType = "after-install"
+		HookTypeBeforeRun     HookType = "before-run"
+		HookTypeAfterRun      HookType = "after-run"
+	)
+
 	// Register some predefined hooks
 	manager.RegisterBuiltin(ctx, HookTypeBeforeInstall, LoggingHook(HookTypeBeforeInstall))
 	manager.RegisterBuiltin(ctx, HookTypeAfterInstall, LoggingHook(HookTypeAfterInstall))
