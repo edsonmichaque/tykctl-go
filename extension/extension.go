@@ -148,7 +148,7 @@ func (i *Installer) InstallExtension(ctx context.Context, owner, repo string) er
 		},
 	}
 
-	if err := i.hooks.Execute(ctx, hook.HookTypeBeforeInstall, hookData); err != nil {
+	if err := i.hooks.Execute(ctx, HookTypeBeforeInstall, hookData); err != nil {
 		i.logger.Error("Before install hook failed", zap.Error(err))
 		return fmt.Errorf("before install hook failed: %w", err)
 	}
@@ -196,7 +196,7 @@ func (i *Installer) InstallExtension(ctx context.Context, owner, repo string) er
 
 	// Execute after install hooks
 	hookData.ExtensionPath = binaryPath
-	if err := i.hooks.Execute(ctx, hook.HookTypeAfterInstall, hookData); err != nil {
+	if err := i.hooks.Execute(ctx, HookTypeAfterInstall, hookData); err != nil {
 		i.logger.Error("After install hook failed", zap.Error(err))
 		// Don't fail the installation if after hooks fail
 	}
@@ -228,7 +228,7 @@ func (i *Installer) RemoveExtension(ctx context.Context, name string) error {
 		},
 	}
 
-	if err := i.hooks.Execute(ctx, hook.HookTypeBeforeUninstall, hookData); err != nil {
+	if err := i.hooks.Execute(ctx, HookTypeBeforeUninstall, hookData); err != nil {
 		i.logger.Error("Before uninstall hook failed", zap.Error(err))
 		return fmt.Errorf("before uninstall hook failed: %w", err)
 	}
@@ -249,7 +249,7 @@ func (i *Installer) RemoveExtension(ctx context.Context, name string) error {
 	i.logger.Info("Extension removed successfully", zap.String("name", name))
 
 	// Execute after uninstall hooks
-	if err := i.hooks.Execute(ctx, hook.HookTypeAfterUninstall, hookData); err != nil {
+	if err := i.hooks.Execute(ctx, HookTypeAfterUninstall, hookData); err != nil {
 		i.logger.Error("After uninstall hook failed", zap.Error(err))
 		// Don't fail the removal if after hooks fail
 	}
