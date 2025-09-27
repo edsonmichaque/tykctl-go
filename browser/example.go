@@ -9,7 +9,7 @@ import (
 
 // Example demonstrates various ways to use the improved browser package
 func Example() {
-	fmt.Println("=== Browser Package Examples ===\n")
+	fmt.Println("=== Browser Package Examples ===")
 
 	// Example 1: Basic usage - simplest way to open a URL
 	fmt.Println("1. Basic Usage:")
@@ -178,7 +178,7 @@ func Example() {
 
 // ExampleAdvanced demonstrates advanced usage patterns
 func ExampleAdvanced() {
-	fmt.Println("=== Advanced Browser Usage ===\n")
+	fmt.Println("=== Advanced Browser Usage ===")
 
 	// Example 1: Browser selection with fallback
 	fmt.Println("1. Browser Selection with Fallback:")
@@ -269,7 +269,7 @@ func ExampleAdvanced() {
 
 // ExampleErrorHandling demonstrates comprehensive error handling
 func ExampleErrorHandling() {
-	fmt.Println("=== Error Handling Examples ===\n")
+	fmt.Println("=== Error Handling Examples ===")
 
 	// Example 1: URL validation errors
 	fmt.Println("1. URL Validation Errors:")
