@@ -170,12 +170,8 @@ if err != nil {
 - Respects the system's default browser setting
 
 ### Linux
-- Tries multiple browsers in order of preference:
-  1. `xdg-open` (most common, respects desktop environment settings)
-  2. `firefox`
-  3. `google-chrome`
-  4. `chromium-browser`
-- Returns an error if no suitable browser is found
+- Uses `xdg-open` - lets the system handle browser selection
+- Simple and reliable approach that respects desktop environment settings
 
 ## Error Handling
 

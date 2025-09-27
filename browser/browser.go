@@ -148,55 +148,33 @@ func (b *DefaultBrowser) validateURL(url string) error {
 // createCommand creates the appropriate command for the platform
 func (b *DefaultBrowser) createCommand(url string) (*exec.Cmd, error) {
 	var cmd *exec.Cmd
-	var args []string
 
 	// Use specific browser if configured
 	if b.config.BrowserName != "" {
-		if !IsAvailable(b.config.BrowserName) {
-			return nil, fmt.Errorf("browser '%s' is not available", b.config.BrowserName)
-		}
-		
-		args = append(args, url)
+		args := []string{url}
 		if b.config.NewWindow {
 			args = append([]string{"--new-window"}, args...)
 		} else if b.config.NewTab {
 			args = append([]string{"--new-tab"}, args...)
 		}
 		args = append(args, b.config.Args...)
-		
 		cmd = exec.Command(b.config.BrowserName, args...)
 		return cmd, nil
 	}
 
-	// Use platform default
+	// Use platform default - simple and direct
 	switch runtime.GOOS {
 	case "windows":
 		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
 	case "darwin":
-		args = []string{url}
+		args := []string{url}
 		if b.config.NewWindow {
 			args = append([]string{"-n"}, args...)
 		}
 		cmd = exec.Command("open", args...)
 	case "linux":
-		// Try common Linux browsers
-		browsers := []string{"xdg-open", "firefox", "google-chrome", "chromium-browser", "chromium"}
-		for _, browser := range browsers {
-			if IsAvailable(browser) {
-				args = []string{url}
-				if b.config.NewWindow && (browser == "firefox" || browser == "google-chrome" || browser == "chromium-browser" || browser == "chromium") {
-					args = append([]string{"--new-window"}, args...)
-				} else if b.config.NewTab && (browser == "firefox" || browser == "google-chrome" || browser == "chromium-browser" || browser == "chromium") {
-					args = append([]string{"--new-tab"}, args...)
-				}
-				args = append(args, b.config.Args...)
-				cmd = exec.Command(browser, args...)
-				break
-			}
-		}
-		if cmd == nil {
-			return nil, fmt.Errorf("no suitable browser found")
-		}
+		// Just use xdg-open - let the system handle browser selection
+		cmd = exec.Command("xdg-open", url)
 	default:
 		return nil, fmt.Errorf("unsupported platform: %s", runtime.GOOS)
 	}
@@ -270,13 +248,6 @@ func GetDefaultBrowser() string {
 	case "darwin":
 		return "open"
 	case "linux":
-		// Try common Linux browsers in order of preference
-		browsers := []string{"xdg-open", "firefox", "google-chrome", "chromium-browser", "chromium"}
-		for _, browser := range browsers {
-			if IsAvailable(browser) {
-				return browser
-			}
-		}
 		return "xdg-open"
 	default:
 		return ""
@@ -287,27 +258,17 @@ func GetDefaultBrowser() string {
 func GetAvailableBrowsers() []string {
 	var browsers []string
 	
-	switch runtime.GOOS {
-	case "windows":
-		candidates := []string{"chrome", "firefox", "edge", "iexplore"}
-		for _, browser := range candidates {
-			if IsAvailable(browser) {
-				browsers = append(browsers, browser)
-			}
-		}
-	case "darwin":
-		candidates := []string{"open", "chrome", "firefox", "safari"}
-		for _, browser := range candidates {
-			if IsAvailable(browser) {
-				browsers = append(browsers, browser)
-			}
-		}
-	case "linux":
-		candidates := []string{"xdg-open", "firefox", "google-chrome", "chromium-browser", "chromium", "konqueror", "opera"}
-		for _, browser := range candidates {
-			if IsAvailable(browser) {
-				browsers = append(browsers, browser)
-			}
+	// Just check for the platform default and common browsers
+	defaultBrowser := GetDefaultBrowser()
+	if defaultBrowser != "" {
+		browsers = append(browsers, defaultBrowser)
+	}
+	
+	// Add common browsers if available
+	commonBrowsers := []string{"firefox", "chrome", "chromium"}
+	for _, browser := range commonBrowsers {
+		if IsAvailable(browser) {
+			browsers = append(browsers, browser)
 		}
 	}
 	
