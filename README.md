@@ -15,6 +15,7 @@ A comprehensive Go library for creating Tyk CLI extensions with best practices, 
 - **Script Execution**: Dynamic script running capabilities
 - **Table Rendering**: Beautiful table formatting and display
 - **JSON Processing**: Pure Go JQ integration for JSON manipulation
+- **JSON Schema**: JSON Schema validation using external gojsonschema library
 - **HTTP Client**: Simple HTTP client for API interactions
 - **Editor Integration**: File editing with external editors
 - **Version Management**: Semantic versioning utilities
@@ -196,6 +197,38 @@ obj, err := jq.ProcessObject(myObject, ".property")
 activeUsers, err := jq.ProcessString(jsonData, ".users[] | select(.active) | .name")
 ```
 
+### JSON Schema (`jsonschema/`)
+JSON Schema validation using the gojsonschema library with context support.
+
+```go
+import (
+    "context"
+    "time"
+    "github.com/TykTechnologies/tykctl-go/jsonschema"
+)
+
+// Create validator from schema string
+validator, err := jsonschema.New(schemaString)
+
+// Validate JSON data with context
+ctx := context.Background()
+result, err := validator.ValidateString(ctx, jsonData)
+
+// Validate with timeout
+ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+defer cancel()
+result, err := validator.ValidateString(ctx, jsonData)
+
+// Convenience functions
+isValid, err := jsonschema.IsValidString(ctx, jsonData, schemaString)
+
+// Validate files
+result, err := jsonschema.ValidateFile(ctx, "data.json", "schema.json")
+
+// Validate directories
+results, err := jsonschema.ValidateDirectory(ctx, "./data", schemaString)
+```
+
 ### Editor Integration (`editor/`)
 File editing with external editors.
 
@@ -236,6 +269,7 @@ Detailed documentation is available in the `docs.md` file, which provides compre
 - **Template System**: Pre-built templates for common extension patterns
 - **Rich CLI Components**: Progress indicators, prompts, tables, and terminal UI
 - **JSON Processing**: Pure Go JQ integration for advanced JSON manipulation
+- **JSON Schema**: Comprehensive JSON Schema validation with context support and detailed error reporting
 - **HTTP Clients**: Both high-level API client and simple HTTP client
 - **File Operations**: File watching, editing, and management utilities
 
