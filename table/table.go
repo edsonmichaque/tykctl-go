@@ -42,10 +42,11 @@ func NewWithWriter(w io.Writer) *Table {
 
 // SetHeaders sets the table headers
 func (t *Table) SetHeaders(headers []string) {
-	t.headers = headers
+	t.headers = make([]string, len(headers))
 	t.widths = make([]int, len(headers))
 	for i, header := range headers {
-		t.widths[i] = len(header)
+		t.headers[i] = strings.ToUpper(header)
+		t.widths[i] = len(t.headers[i])
 	}
 }
 
@@ -109,9 +110,9 @@ func (t *Table) Render() error {
 func (t *Table) renderHeaders(w io.Writer) error {
 	headerRow := make([]string, len(t.headers))
 	for i, header := range t.headers {
-		headerRow[i] = t.terminal.Blue(header)
+		headerRow[i] = t.terminal.Blue(strings.ToUpper(header))
 	}
-	
+
 	_, err := fmt.Fprintln(w, strings.Join(headerRow, t.separator))
 	return err
 }

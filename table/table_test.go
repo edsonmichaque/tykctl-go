@@ -28,6 +28,23 @@ func TestSetHeaders(t *testing.T) {
 	// This test mainly ensures the method doesn't panic
 }
 
+func TestSetHeadersConvertsToUppercase(t *testing.T) {
+	table := New()
+	headers := []string{"name", "age", "city"}
+	table.SetHeaders(headers)
+
+	// Check that headers are stored in uppercase internally
+	if table.headers[0] != "NAME" {
+		t.Errorf("Expected header 'NAME', got '%s'", table.headers[0])
+	}
+	if table.headers[1] != "AGE" {
+		t.Errorf("Expected header 'AGE', got '%s'", table.headers[1])
+	}
+	if table.headers[2] != "CITY" {
+		t.Errorf("Expected header 'CITY', got '%s'", table.headers[2])
+	}
+}
+
 func TestAddRow(t *testing.T) {
 	table := New()
 	headers := []string{"Name", "Age"}
