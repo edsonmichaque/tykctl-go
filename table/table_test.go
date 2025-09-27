@@ -1,7 +1,9 @@
 package table
 
 import (
+	"bytes"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/olekukonko/tablewriter/tw"
@@ -70,32 +72,89 @@ func TestAddRows(t *testing.T) {
 
 func TestSetBorder(t *testing.T) {
 	table := New()
+
+	// Test default is borderless
+	if table.border {
+		t.Error("Expected default border to be false")
+	}
+
+	// Test setting border to true
 	table.SetBorder(true)
-	// This test mainly ensures the method doesn't panic
+	if !table.border {
+		t.Error("Expected border to be true after SetBorder(true)")
+	}
+
+	// Test setting border to false
+	table.SetBorder(false)
+	if table.border {
+		t.Error("Expected border to be false after SetBorder(false)")
+	}
 }
 
 func TestSetCenterSeparator(t *testing.T) {
 	table := New()
+
+	// Test default center separator
+	if table.centerSeparator != "+" {
+		t.Errorf("Expected default center separator to be '+', got '%s'", table.centerSeparator)
+	}
+
+	// Test setting center separator
 	table.SetCenterSeparator("|")
-	// This test mainly ensures the method doesn't panic
+	if table.centerSeparator != "|" {
+		t.Errorf("Expected center separator to be '|', got '%s'", table.centerSeparator)
+	}
 }
 
 func TestSetColumnSeparator(t *testing.T) {
 	table := New()
-	table.SetColumnSeparator("|")
-	// This test mainly ensures the method doesn't panic
+
+	// Test default column separator
+	if table.columnSeparator != "|" {
+		t.Errorf("Expected default column separator to be '|', got '%s'", table.columnSeparator)
+	}
+
+	// Test setting column separator
+	table.SetColumnSeparator("||")
+	if table.columnSeparator != "||" {
+		t.Errorf("Expected column separator to be '||', got '%s'", table.columnSeparator)
+	}
 }
 
 func TestSetRowSeparator(t *testing.T) {
 	table := New()
-	table.SetRowSeparator("-")
-	// This test mainly ensures the method doesn't panic
+
+	// Test default row separator
+	if table.rowSeparator != "-" {
+		t.Errorf("Expected default row separator to be '-', got '%s'", table.rowSeparator)
+	}
+
+	// Test setting row separator
+	table.SetRowSeparator("=")
+	if table.rowSeparator != "=" {
+		t.Errorf("Expected row separator to be '=', got '%s'", table.rowSeparator)
+	}
 }
 
 func TestSetHeaderLine(t *testing.T) {
 	table := New()
+
+	// Test default header line
+	if table.headerLine {
+		t.Error("Expected default header line to be false")
+	}
+
+	// Test setting header line to true
 	table.SetHeaderLine(true)
-	// This test mainly ensures the method doesn't panic
+	if !table.headerLine {
+		t.Error("Expected header line to be true after SetHeaderLine(true)")
+	}
+
+	// Test setting header line to false
+	table.SetHeaderLine(false)
+	if table.headerLine {
+		t.Error("Expected header line to be false after SetHeaderLine(false)")
+	}
 }
 
 func TestSetColumnAlignment(t *testing.T) {
@@ -141,4 +200,101 @@ func TestSetFooter(t *testing.T) {
 	footer := []string{"Total", "2"}
 	table.SetFooter(footer)
 	// This test mainly ensures the method doesn't panic
+}
+
+func TestBorderlessRenderingDefault(t *testing.T) {
+	var buf bytes.Buffer
+	table := NewWithWriter(&buf)
+
+	table.SetHeaders([]string{"name", "age"})
+	table.AddRow([]string{"John", "30"})
+	table.AddRow([]string{"Jane", "25"})
+
+	err := table.Render()
+	if err != nil {
+		t.Errorf("Render failed: %v", err)
+	}
+
+	output := buf.String()
+	// Should not contain border characters
+	if strings.Contains(output, "|") || strings.Contains(output, "+") || strings.Contains(output, "-") {
+		t.Errorf("Borderless table should not contain border characters, got:\n%s", output)
+	}
+
+	// Should contain headers in uppercase
+	if !strings.Contains(output, "NAME") || !strings.Contains(output, "AGE") {
+		t.Errorf("Expected uppercase headers NAME and AGE, got:\n%s", output)
+	}
+}
+
+func TestBorderedRendering(t *testing.T) {
+	var buf bytes.Buffer
+	table := NewWithWriter(&buf)
+
+	table.SetHeaders([]string{"name", "age"})
+	table.AddRow([]string{"John", "30"})
+	table.AddRow([]string{"Jane", "25"})
+	table.SetBorder(true)
+
+	err := table.Render()
+	if err != nil {
+		t.Errorf("Render failed: %v", err)
+	}
+
+	output := buf.String()
+	// Should contain border characters
+	if !strings.Contains(output, "|") || !strings.Contains(output, "+") || !strings.Contains(output, "-") {
+		t.Errorf("Bordered table should contain border characters, got:\n%s", output)
+	}
+
+	// Should contain headers in uppercase
+	if !strings.Contains(output, "NAME") || !strings.Contains(output, "AGE") {
+		t.Errorf("Expected uppercase headers NAME and AGE, got:\n%s", output)
+	}
+}
+
+func TestBorderedRenderingWithHeaderLine(t *testing.T) {
+	var buf bytes.Buffer
+	table := NewWithWriter(&buf)
+
+	table.SetHeaders([]string{"name", "age"})
+	table.AddRow([]string{"John", "30"})
+	table.SetBorder(true)
+	table.SetHeaderLine(true)
+
+	err := table.Render()
+	if err != nil {
+		t.Errorf("Render failed: %v", err)
+	}
+
+	output := buf.String()
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+
+	// Should have at least 4 lines: top border, header, header separator, data row, bottom border
+	if len(lines) < 5 {
+		t.Errorf("Expected at least 5 lines with header line enabled, got %d:\n%s", len(lines), output)
+	}
+}
+
+func TestCustomBorderCharacters(t *testing.T) {
+	var buf bytes.Buffer
+	table := NewWithWriter(&buf)
+
+	table.SetHeaders([]string{"name", "age"})
+	table.AddRow([]string{"John", "30"})
+	table.SetBorder(true)
+	table.SetCenterSeparator("*")
+	table.SetColumnSeparator(":")
+	table.SetRowSeparator("=")
+
+	err := table.Render()
+	if err != nil {
+		t.Errorf("Render failed: %v", err)
+	}
+
+	output := buf.String()
+	// Should contain custom border characters
+	if !strings.Contains(output, "*") || !strings.Contains(output, ":") || !strings.Contains(output, "=") {
+		t.Errorf("Expected custom border characters *, :, =, got:\n%s", output)
+	}
 }

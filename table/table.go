@@ -13,30 +13,45 @@ import (
 
 // Table represents a table for formatted output
 type Table struct {
-	headers    []string
-	rows       [][]string
-	output     io.Writer
-	terminal   *terminal.Terminal
-	separator  string
-	alignment  []int
-	widths     []int
+	headers         []string
+	rows            [][]string
+	output          io.Writer
+	terminal        *terminal.Terminal
+	separator       string
+	alignment       []int
+	widths          []int
+	border          bool
+	centerSeparator string
+	columnSeparator string
+	rowSeparator    string
+	headerLine      bool
 }
 
 // New creates a new table instance
 func New() *Table {
 	return &Table{
-		output:    os.Stdout,
-		terminal:  terminal.New(),
-		separator: "\t",
+		output:          os.Stdout,
+		terminal:        terminal.New(),
+		separator:       "\t",
+		border:          false, // Default to borderless
+		centerSeparator: "+",
+		columnSeparator: "|",
+		rowSeparator:    "-",
+		headerLine:      false,
 	}
 }
 
 // NewWithWriter creates a new table with a custom writer
 func NewWithWriter(w io.Writer) *Table {
 	return &Table{
-		output:    w,
-		terminal:  terminal.New(),
-		separator: "\t",
+		output:          w,
+		terminal:        terminal.New(),
+		separator:       "\t",
+		border:          false, // Default to borderless
+		centerSeparator: "+",
+		columnSeparator: "|",
+		rowSeparator:    "-",
+		headerLine:      false,
 	}
 }
 
@@ -87,6 +102,14 @@ func (t *Table) Render() error {
 		return fmt.Errorf("no headers set")
 	}
 
+	if t.border {
+		return t.renderWithBorders()
+	}
+	return t.renderWithoutBorders()
+}
+
+// renderWithoutBorders renders the table without borders (default behavior)
+func (t *Table) renderWithoutBorders() error {
 	// Create tabwriter for formatted output
 	w := tabwriter.NewWriter(t.output, 0, 0, 2, ' ', 0)
 	defer w.Flush()
@@ -104,6 +127,36 @@ func (t *Table) Render() error {
 	}
 
 	return nil
+}
+
+// renderWithBorders renders the table with borders
+func (t *Table) renderWithBorders() error {
+	// Render top border
+	if err := t.renderTopBorder(); err != nil {
+		return err
+	}
+
+	// Render headers with borders
+	if err := t.renderHeadersWithBorders(); err != nil {
+		return err
+	}
+
+	// Render header separator line if enabled
+	if t.headerLine {
+		if err := t.renderHeaderSeparator(); err != nil {
+			return err
+		}
+	}
+
+	// Render rows with borders
+	for _, row := range t.rows {
+		if err := t.renderRowWithBorders(row); err != nil {
+			return err
+		}
+	}
+
+	// Render bottom border
+	return t.renderBottomBorder()
 }
 
 // renderHeaders renders the table headers
@@ -128,9 +181,75 @@ func (t *Table) renderRow(w io.Writer, row []string) error {
 			paddedRow[i] = ""
 		}
 	}
-	
+
 	_, err := fmt.Fprintln(w, strings.Join(paddedRow, t.separator))
 	return err
+}
+
+// Border rendering helper methods
+
+// renderTopBorder renders the top border of the table
+func (t *Table) renderTopBorder() error {
+	border := t.createHorizontalBorder()
+	_, err := fmt.Fprintln(t.output, border)
+	return err
+}
+
+// renderBottomBorder renders the bottom border of the table
+func (t *Table) renderBottomBorder() error {
+	border := t.createHorizontalBorder()
+	_, err := fmt.Fprintln(t.output, border)
+	return err
+}
+
+// renderHeaderSeparator renders the line under headers
+func (t *Table) renderHeaderSeparator() error {
+	border := t.createHorizontalBorder()
+	_, err := fmt.Fprintln(t.output, border)
+	return err
+}
+
+// renderHeadersWithBorders renders headers with column separators
+func (t *Table) renderHeadersWithBorders() error {
+	headerRow := make([]string, len(t.headers))
+	for i, header := range t.headers {
+		headerRow[i] = t.terminal.Blue(strings.ToUpper(header))
+	}
+
+	line := t.columnSeparator + " " + strings.Join(headerRow, " "+t.columnSeparator+" ") + " " + t.columnSeparator
+	_, err := fmt.Fprintln(t.output, line)
+	return err
+}
+
+// renderRowWithBorders renders a row with column separators
+func (t *Table) renderRowWithBorders(row []string) error {
+	// Pad row to match header length
+	paddedRow := make([]string, len(t.headers))
+	for i := 0; i < len(t.headers); i++ {
+		if i < len(row) {
+			paddedRow[i] = row[i]
+		} else {
+			paddedRow[i] = ""
+		}
+	}
+
+	line := t.columnSeparator + " " + strings.Join(paddedRow, " "+t.columnSeparator+" ") + " " + t.columnSeparator
+	_, err := fmt.Fprintln(t.output, line)
+	return err
+}
+
+// createHorizontalBorder creates a horizontal border line
+func (t *Table) createHorizontalBorder() string {
+	if len(t.widths) == 0 {
+		return ""
+	}
+
+	parts := make([]string, len(t.widths))
+	for i, width := range t.widths {
+		parts[i] = strings.Repeat(t.rowSeparator, width+2) // +2 for padding
+	}
+
+	return t.centerSeparator + strings.Join(parts, t.centerSeparator) + t.centerSeparator
 }
 
 // GetWidth returns the table width
@@ -200,19 +319,24 @@ func (t *Table) GetTerminal() *terminal.Terminal {
 func (t *Table) Format() string {
 	var buf strings.Builder
 	tempTable := &Table{
-		headers:   t.headers,
-		rows:      t.rows,
-		output:    &buf,
-		terminal:  t.terminal,
-		separator: t.separator,
-		alignment: t.alignment,
-		widths:    t.widths,
+		headers:         t.headers,
+		rows:            t.rows,
+		output:          &buf,
+		terminal:        t.terminal,
+		separator:       t.separator,
+		alignment:       t.alignment,
+		widths:          t.widths,
+		border:          t.border,
+		centerSeparator: t.centerSeparator,
+		columnSeparator: t.columnSeparator,
+		rowSeparator:    t.rowSeparator,
+		headerLine:      t.headerLine,
 	}
-	
+
 	if err := tempTable.Render(); err != nil {
 		return ""
 	}
-	
+
 	return buf.String()
 }
 
@@ -230,32 +354,31 @@ func (t *Table) PrintTo(w io.Writer) error {
 	return t.Render()
 }
 
-// API compatibility methods for maintaining public interface
-// These methods are no-ops to maintain borderless table behavior
+// Border configuration methods
 
-// SetBorder sets the border flag (no-op for borderless tables)
+// SetBorder sets whether the table should have borders
 func (t *Table) SetBorder(border bool) {
-	// No-op: this implementation is always borderless
+	t.border = border
 }
 
-// SetCenterSeparator sets the center separator (no-op for borderless tables)
+// SetCenterSeparator sets the center separator character for borders
 func (t *Table) SetCenterSeparator(separator string) {
-	// No-op: this implementation is always borderless
+	t.centerSeparator = separator
 }
 
-// SetColumnSeparator sets the column separator (no-op for borderless tables)
+// SetColumnSeparator sets the column separator character for borders
 func (t *Table) SetColumnSeparator(separator string) {
-	// No-op: this implementation is always borderless
+	t.columnSeparator = separator
 }
 
-// SetRowSeparator sets the row separator (no-op for borderless tables)
+// SetRowSeparator sets the row separator character for borders
 func (t *Table) SetRowSeparator(separator string) {
-	// No-op: this implementation is always borderless
+	t.rowSeparator = separator
 }
 
-// SetHeaderLine sets the header line flag (no-op for borderless tables)
+// SetHeaderLine sets whether there should be a line under headers
 func (t *Table) SetHeaderLine(line bool) {
-	// No-op: this implementation is always borderless
+	t.headerLine = line
 }
 
 // SetColumnAlignment sets the column alignment (no-op for borderless tables)
