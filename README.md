@@ -14,7 +14,7 @@ A comprehensive Go library for creating Tyk CLI extensions with best practices, 
 - **Browser Integration**: Web browser automation and interaction
 - **Script Execution**: Dynamic script running capabilities
 - **Table Rendering**: Beautiful table formatting and display
-- **JSON Processing**: JQ integration for JSON manipulation
+- **JSON Processing**: Pure Go JQ integration for JSON manipulation
 - **HTTP Client**: Simple HTTP client for API interactions
 - **Editor Integration**: File editing with external editors
 - **Version Management**: Semantic versioning utilities
@@ -178,7 +178,7 @@ tbl.Render()
 ```
 
 ### JSON Processing (`jq/`)
-Simple JQ integration for JSON manipulation and processing.
+Pure Go JQ integration for JSON manipulation and processing using gojq.
 
 ```go
 import "github.com/TykTechnologies/tykctl-go/jq"
@@ -191,6 +191,9 @@ data, err := jq.Process(jsonBytes, ".field")
 
 // Process Go object
 obj, err := jq.ProcessObject(myObject, ".property")
+
+// Complex queries
+activeUsers, err := jq.ProcessString(jsonData, ".users[] | select(.active) | .name")
 ```
 
 ### Editor Integration (`editor/`)
@@ -232,7 +235,7 @@ Detailed documentation is available in the `docs.md` file, which provides compre
 - **Hook System**: Event-driven hooks with support for builtin, external, and Rego hooks
 - **Template System**: Pre-built templates for common extension patterns
 - **Rich CLI Components**: Progress indicators, prompts, tables, and terminal UI
-- **JSON Processing**: JQ integration for advanced JSON manipulation
+- **JSON Processing**: Pure Go JQ integration for advanced JSON manipulation
 - **HTTP Clients**: Both high-level API client and simple HTTP client
 - **File Operations**: File watching, editing, and management utilities
 
