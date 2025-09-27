@@ -8,6 +8,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/edsonmichaque/tykctl-go/terminal"
+	"github.com/olekukonko/tablewriter/tw"
 )
 
 // Table represents a table for formatted output
@@ -224,6 +225,69 @@ func (t *Table) PrintTo(w io.Writer) error {
 	originalOutput := t.output
 	t.output = w
 	defer func() { t.output = originalOutput }()
-	
+
 	return t.Render()
+}
+
+// API compatibility methods for maintaining public interface
+// These methods are no-ops to maintain borderless table behavior
+
+// SetBorder sets the border flag (no-op for borderless tables)
+func (t *Table) SetBorder(border bool) {
+	// No-op: this implementation is always borderless
+}
+
+// SetCenterSeparator sets the center separator (no-op for borderless tables)
+func (t *Table) SetCenterSeparator(separator string) {
+	// No-op: this implementation is always borderless
+}
+
+// SetColumnSeparator sets the column separator (no-op for borderless tables)
+func (t *Table) SetColumnSeparator(separator string) {
+	// No-op: this implementation is always borderless
+}
+
+// SetRowSeparator sets the row separator (no-op for borderless tables)
+func (t *Table) SetRowSeparator(separator string) {
+	// No-op: this implementation is always borderless
+}
+
+// SetHeaderLine sets the header line flag (no-op for borderless tables)
+func (t *Table) SetHeaderLine(line bool) {
+	// No-op: this implementation is always borderless
+}
+
+// SetColumnAlignment sets the column alignment (no-op for borderless tables)
+func (t *Table) SetColumnAlignment(alignment []tw.Align) {
+	// No-op: this implementation uses fixed left alignment
+}
+
+// SetHeaderAlignment sets the header alignment (no-op for borderless tables)
+func (t *Table) SetHeaderAlignment(alignment []tw.Align) {
+	// No-op: this implementation uses fixed left alignment
+}
+
+// SetAutoWrapText sets the auto wrap text flag (no-op for borderless tables)
+func (t *Table) SetAutoWrapText(wrap bool) {
+	// No-op: this implementation doesn't support text wrapping
+}
+
+// SetReflowDuringAutoWrap sets the reflow during auto wrap flag (no-op for borderless tables)
+func (t *Table) SetReflowDuringAutoWrap(reflow bool) {
+	// No-op: this implementation doesn't support text wrapping
+}
+
+// SetTablePadding sets the table padding (no-op for borderless tables)
+func (t *Table) SetTablePadding(padding string) {
+	// No-op: this implementation uses fixed padding
+}
+
+// SetNoWhiteSpace sets the no white space flag (no-op for borderless tables)
+func (t *Table) SetNoWhiteSpace(noWhiteSpace bool) {
+	// No-op: this implementation uses fixed spacing
+}
+
+// SetFooter sets the table footer (no-op for borderless tables)
+func (t *Table) SetFooter(footer []string) {
+	// No-op: this implementation doesn't support footers
 }
