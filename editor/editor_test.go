@@ -4,9 +4,77 @@ import (
 	"context"
 	"os"
 	"testing"
+	"time"
 )
 
-func TestDetectEditor(t *testing.T) {
+func TestNew(t *testing.T) {
+	editor := New()
+	if editor == nil {
+		t.Error("New() returned nil")
+	}
+}
+
+func TestNewWithEditor(t *testing.T) {
+	editor := NewWithEditor("vim")
+	if editor == nil {
+		t.Error("NewWithEditor() returned nil")
+	}
+}
+
+func TestSetEditor(t *testing.T) {
+	editor := New()
+	editor.SetEditor("nano")
+	// We can't easily test the internal state, but we can verify it doesn't panic
+}
+
+func TestSetArgs(t *testing.T) {
+	editor := New()
+	args := []string{"-w", "-n"}
+	editor.SetArgs(args)
+	// We can't easily test the internal state, but we can verify it doesn't panic
+}
+
+func TestSetTimeout(t *testing.T) {
+	editor := New()
+	timeout := 10 * time.Minute
+	editor.SetTimeout(timeout)
+	// We can't easily test the internal state, but we can verify it doesn't panic
+}
+
+func TestEditFile(t *testing.T) {
+	editor := New()
+	ctx := context.Background()
+
+	// Test with non-existent file (should still try to open)
+	// This will likely fail, but we're testing the interface
+	err := editor.EditFile(ctx, "/tmp/non-existent-file-for-testing")
+
+	// We expect an error since the file doesn't exist and the editor will fail
+	// The important thing is that the method doesn't panic
+	if err == nil {
+		t.Log("EditFile() succeeded unexpectedly (editor might have created the file)")
+	} else {
+		t.Logf("EditFile() failed as expected: %v", err)
+	}
+}
+
+func TestEditString(t *testing.T) {
+	editor := New()
+	ctx := context.Background()
+
+	// Test editing a string
+	content := "Hello, World!"
+	result, err := editor.EditString(ctx, content)
+
+	// This will likely fail in a test environment, but we're testing the interface
+	if err == nil {
+		t.Logf("EditString() succeeded, result: %s", result)
+	} else {
+		t.Logf("EditString() failed as expected: %v", err)
+	}
+}
+
+func TestGetDefaultEditor(t *testing.T) {
 	// Save original environment
 	originalEditor := os.Getenv("EDITOR")
 	originalVisual := os.Getenv("VISUAL")
@@ -67,7 +135,7 @@ func TestDetectEditor(t *testing.T) {
 			}
 
 			// Test detection
-			detected := DetectEditor()
+			detected := getDefaultEditor()
 
 			// For the fallback case, we can't predict which editor will be found
 			// so we just check that something is returned or empty
@@ -76,101 +144,31 @@ func TestDetectEditor(t *testing.T) {
 				_ = detected
 			} else {
 				if detected != tt.expected {
-					t.Errorf("DetectEditor() = %v, want %v", detected, tt.expected)
+					t.Errorf("getDefaultEditor() = %v, want %v", detected, tt.expected)
 				}
 			}
 		})
 	}
 }
 
-func TestNew(t *testing.T) {
-	editor := New()
-	if editor == nil {
-		t.Error("New() returned nil")
-	}
-
-	// Verify it's an Editor
-	if editor == nil {
-		t.Error("New() did not return an Editor")
+// Benchmark tests
+func BenchmarkNew(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		editor := New()
+		_ = editor
 	}
 }
 
-func TestEditor_Open(t *testing.T) {
-	editor := New()
-	ctx := context.Background()
-
-	// Test with non-existent file (should still try to open)
-	// This will likely fail, but we're testing the interface
-	err := editor.Open(ctx, "/tmp/non-existent-file-for-testing")
-
-	// We expect an error since the file doesn't exist and the editor will fail
-	// The important thing is that the method doesn't panic
-	if err == nil {
-		t.Log("Open() succeeded unexpectedly (editor might have created the file)")
-	} else {
-		t.Logf("Open() failed as expected: %v", err)
+func BenchmarkNewWithEditor(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		editor := NewWithEditor("vim")
+		_ = editor
 	}
 }
 
-func TestHasContentChanged(t *testing.T) {
-	tests := []struct {
-		name     string
-		original []byte
-		edited   []byte
-		expected bool
-	}{
-		{
-			name:     "identical content",
-			original: []byte("hello world"),
-			edited:   []byte("hello world"),
-			expected: false,
-		},
-		{
-			name:     "different content",
-			original: []byte("hello world"),
-			edited:   []byte("hello universe"),
-			expected: true,
-		},
-		{
-			name:     "empty vs content",
-			original: []byte(""),
-			edited:   []byte("hello"),
-			expected: true,
-		},
-		{
-			name:     "content vs empty",
-			original: []byte("hello"),
-			edited:   []byte(""),
-			expected: true,
-		},
-		{
-			name:     "whitespace difference",
-			original: []byte("hello world"),
-			edited:   []byte("hello  world"), // extra space
-			expected: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := hasContentChanged(tt.original, tt.edited)
-			if result != tt.expected {
-				t.Errorf("hasContentChanged() = %v, want %v", result, tt.expected)
-			}
-		})
-	}
-}
-
-func TestErrNoChanges(t *testing.T) {
-	// Test that ErrNoChanges is a known error type
-	err := ErrNoChanges
-	if err == nil {
-		t.Error("ErrNoChanges should not be nil")
-	}
-
-	// Test error message
-	expectedMsg := "no changes detected - content is identical to original"
-	if err.Error() != expectedMsg {
-		t.Errorf("ErrNoChanges.Error() = %v, want %v", err.Error(), expectedMsg)
+func BenchmarkGetDefaultEditor(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		editor := getDefaultEditor()
+		_ = editor
 	}
 }
