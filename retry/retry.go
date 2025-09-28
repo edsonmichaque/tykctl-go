@@ -51,7 +51,7 @@ func Retry(ctx context.Context, config *Config, operation Operation) error {
 	backoffWithContext := backoff.WithContext(backoffConfig, ctx)
 
 	// Execute operation with backoff
-	err := backoff.Retry(operation, backoffWithContext)
+	err := backoff.Retry(backoff.Operation(operation), backoffWithContext)
 	if err != nil {
 		return fmt.Errorf("operation failed after retries: %w", err)
 	}
