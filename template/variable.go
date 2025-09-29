@@ -20,3 +20,4 @@ type Validation struct {
 	MaxValue  *float64 `yaml:"max_value,omitempty"`
 }
 
+

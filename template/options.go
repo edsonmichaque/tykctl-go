@@ -141,3 +141,4 @@ func Resolve(ctx context.Context, opts ...Option) (*Template, error) {
 	// No source specified
 	return nil, NewTemplateError(ErrorTypeNoSource, "", ErrNoSourceSpecified)
 }
+

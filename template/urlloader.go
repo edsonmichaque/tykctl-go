@@ -75,3 +75,4 @@ func (u *URLLoader) Load(ctx context.Context) (*Template, error) {
 		return &template, nil
 	})
 }
+
