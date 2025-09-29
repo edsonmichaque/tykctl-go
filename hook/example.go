@@ -9,56 +9,52 @@ import (
 
 // Example demonstrates how to use the hook system
 func Example() {
-	// Create a hook manager
-	manager := New()
+	// Create a builtin processor
+	processor := NewBuiltinProcessor(nil)
 	ctx := context.Background()
 
-	// Define custom hook types for this example
-	const (
-		HookTypeBeforeInstall HookType = "before-install"
-		HookTypeAfterInstall  HookType = "after-install"
-		HookTypeBeforeRun     HookType = "before-run"
-		HookTypeAfterRun      HookType = "after-run"
-	)
-
-	// Register some predefined hooks
-	manager.RegisterBuiltin(ctx, HookTypeBeforeInstall, LoggingHook(HookTypeBeforeInstall))
-	manager.RegisterBuiltin(ctx, HookTypeAfterInstall, LoggingHook(HookTypeAfterInstall))
-	manager.RegisterBuiltin(ctx, HookTypeBeforeRun, TimingHook(HookTypeBeforeRun))
-	manager.RegisterBuiltin(ctx, HookTypeAfterRun, TimingHook(HookTypeAfterRun))
-
-	// Register a custom hook
-	manager.RegisterBuiltin(ctx, HookTypeBeforeInstall, func(ctx context.Context, data *HookData) error {
-		log.Printf("Custom hook: Installing extension %s", data.ExtensionName)
+	// Register some builtin hooks
+	err := processor.Register("before-install", func(ctx context.Context, data *Data) error {
+		log.Printf("Before install hook: Installing extension %s", data.Extension)
 		return nil
 	})
-
-	// Register a validation hook
-	manager.RegisterBuiltin(ctx, HookTypeBeforeInstall, ValidationHook(func(data *HookData) error {
-		if data.ExtensionName == "" {
-			return fmt.Errorf("extension name cannot be empty")
-		}
-		return nil
-	}))
-
-	// Register a metrics hook
-	manager.RegisterBuiltin(ctx, HookTypeAfterInstall, MetricsHook(func(operation string, metrics map[string]interface{}) error {
-		log.Printf("Metrics: %s - %+v", operation, metrics)
-		return nil
-	}))
-
-	// Execute hooks
-	hookData := &HookData{
-		ExtensionName: "my-extension",
-		ExtensionPath: "/path/to/extension",
-		Metadata: map[string]interface{}{
-			"version": "1.0.0",
-			"author":  "example",
-		},
+	if err != nil {
+		log.Fatal(err)
 	}
 
+	err = processor.Register("after-install", func(ctx context.Context, data *Data) error {
+		log.Printf("After install hook: Extension %s installed", data.Extension)
+		return nil
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = processor.Register("before-run", func(ctx context.Context, data *Data) error {
+		log.Printf("Before run hook: Starting extension %s", data.Extension)
+		return nil
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = processor.Register("after-run", func(ctx context.Context, data *Data) error {
+		log.Printf("After run hook: Extension %s completed", data.Extension)
+		return nil
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Execute hooks
+	hookData := NewData("before-install", "my-extension").
+		WithMetadataMap(map[string]interface{}{
+			"version": "1.0.0",
+			"author":  "example",
+		})
+
 	// Execute before install hooks
-	if err := manager.Execute(ctx, HookTypeBeforeInstall, hookData); err != nil {
+	if err := processor.Execute(ctx, "before-install", hookData); err != nil {
 		log.Printf("Before install hooks failed: %v", err)
 		return
 	}
@@ -67,24 +63,72 @@ func Example() {
 	time.Sleep(100 * time.Millisecond)
 
 	// Execute after install hooks
-	if err := manager.Execute(ctx, HookTypeAfterInstall, hookData); err != nil {
+	hookData.Type = "after-install"
+	if err := processor.Execute(ctx, "after-install", hookData); err != nil {
 		log.Printf("After install hooks failed: %v", err)
 		return
 	}
 
-	// Execute hooks asynchronously
-	errChan := manager.ExecuteAsync(ctx, HookTypeBeforeRun, hookData)
-	select {
-	case err := <-errChan:
-		if err != nil {
-			log.Printf("Async hooks failed: %v", err)
-		}
-	case <-time.After(1 * time.Second):
-		log.Printf("Async hooks timed out")
+	// Execute before run hooks
+	hookData.Type = "before-run"
+	if err := processor.Execute(ctx, "before-run", hookData); err != nil {
+		log.Printf("Before run hooks failed: %v", err)
+		return
 	}
 
-	// List registered hooks
-	fmt.Printf("Registered hook types: %v\n", manager.HookTypes(ctx))
-	fmt.Printf("Before install hooks count: %d\n", manager.Count(ctx, HookTypeBeforeInstall))
-	fmt.Printf("Has before install hooks: %t\n", manager.HasHooks(ctx, HookTypeBeforeInstall))
+	// Simulate running work
+	time.Sleep(100 * time.Millisecond)
+
+	// Execute after run hooks
+	hookData.Type = "after-run"
+	if err := processor.Execute(ctx, "after-run", hookData); err != nil {
+		log.Printf("After run hooks failed: %v", err)
+		return
+	}
+
+	fmt.Println("All hooks executed successfully!")
+}
+
+// ExamplePolicyProcessor demonstrates how to use the policy processor
+func ExamplePolicyProcessor() {
+	// Create a policy processor
+	processor := NewPolicyProcessor(nil, "/path/to/policies")
+	ctx := context.Background()
+
+	// Execute policy hooks
+	hookData := NewData("before-install", "my-extension").
+		WithMetadata("version", "1.0.0")
+
+	err := processor.Execute(ctx, "before-install", hookData)
+	if err != nil {
+		log.Printf("Policy execution failed: %v", err)
+	}
+
+	// Get the underlying Rego executor for advanced usage
+	regoExecutor := processor.GetRegoExecutor()
+	if regoExecutor != nil {
+		log.Println("Rego executor is available")
+	}
+}
+
+// ExampleScriptProcessor demonstrates how to use the script processor
+func ExampleScriptProcessor() {
+	// Create a script processor
+	processor := NewScriptProcessor(nil, "/path/to/scripts")
+	ctx := context.Background()
+
+	// Execute script hooks
+	hookData := NewData("before-install", "my-extension").
+		WithMetadata("version", "1.0.0")
+
+	err := processor.Execute(ctx, "before-install", hookData)
+	if err != nil {
+		log.Printf("Script execution failed: %v", err)
+	}
+
+	// Get the underlying script executor for advanced usage
+	scriptExecutor := processor.GetScriptExecutor()
+	if scriptExecutor != nil {
+		log.Println("Script executor is available")
+	}
 }

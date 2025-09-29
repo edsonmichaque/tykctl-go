@@ -16,7 +16,7 @@ import (
 type Runner struct {
 	configDir string
 	logger    *zap.Logger
-	hooks     *hook.Manager
+	hooks     *hook.BuiltinProcessor
 }
 
 // NewRunner creates a new extension runner
@@ -25,12 +25,12 @@ func NewRunner(configDir string) *Runner {
 	return &Runner{
 		configDir: configDir,
 		logger:    logger,
-		hooks:     hook.New(),
+		hooks:     hook.NewBuiltinProcessor(logger),
 	}
 }
 
 // NewRunnerWithHooks creates a new extension runner with custom hooks
-func NewRunnerWithHooks(configDir string, hooks *hook.Manager) *Runner {
+func NewRunnerWithHooks(configDir string, hooks *hook.BuiltinProcessor) *Runner {
 	logger := zap.L()
 	return &Runner{
 		configDir: configDir,
@@ -47,13 +47,9 @@ func (r *Runner) RunExtension(ctx context.Context, extensionName string, args []
 	}
 
 	// Execute before run hooks
-	hookData := &hook.HookData{
-		ExtensionName: extensionName,
-		ExtensionPath: extensionPath,
-		Metadata: map[string]interface{}{
-			"args": args,
-		},
-	}
+	hookData := hook.NewData(HookTypeBeforeRun, extensionName).
+		WithMetadata("path", extensionPath).
+		WithMetadata("args", args)
 
 	if err := r.hooks.Execute(ctx, HookTypeBeforeRun, hookData); err != nil {
 		r.logger.Error("Before run hook failed", zap.Error(err))

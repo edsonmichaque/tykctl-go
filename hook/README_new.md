@@ -8,111 +8,26 @@ The hook package provides a clean, modular system for managing and executing hoo
 
 ## Architecture
 
-The package follows Go best practices with a clean, modular design:
+The package follows the same Go-idiomatic pattern as the template package:
 
-### Executors
-- **BuiltinExecutor** - executes builtin Go hooks
-- **ScriptExecutor** - executes external script hooks with discovery
-- **RegoExecutor** - executes Rego policy hooks with discovery
-- **SchemaExecutor** - executes JSON Schema validation hooks with discovery
-
-### Processors
-- **BuiltinProcessor** - handles only builtin hooks
-- **ScriptProcessor** - handles only script hooks with discovery
-- **PolicyProcessor** - handles only Rego policy hooks with discovery
-- **SchemaProcessor** - handles only JSON Schema validation hooks with discovery
-- **Processor** - orchestrates multiple executors
-
-### Validators
-- **BuiltinValidator** - validates builtin hook data
-- **ScriptValidator** - validates script hook data
-- **PolicyValidator** - validates Rego policy hook data
-- **SchemaValidator** - validates JSON Schema hook data
-- **HookValidator** - general-purpose hook validator
+- **Executor** (interface) - for executing hooks
+- **BuiltinExecutor** (concrete) - for builtin Go hooks
+- **ExternalExecutor** (concrete) - for external script hooks
+- **RegoExecutor** (concrete) - for Rego policy hooks
+- **Validator** (interface) - for validating hook data
+- **HookValidator** (concrete) - for validating hooks
+- **Processor** (concrete) - orchestrates all executors
 
 ## Key Features
 
-- **Modular Design**: Specialized processors for different hook types
-- **Automatic Discovery**: Script, policy, and schema files are automatically discovered
-- **Variadic Parameters**: Flexible discovery methods that can find all or specific hook types
+- **Interface-Based Design**: Clean interfaces for extensibility
+- **Multiple Hook Types**: Support for builtin, external, and Rego hooks
 - **Context Support**: Full context.Context integration for cancellation and timeouts
-- **Smart Caching**: Efficient caching of discovered files for better performance
-- **Comprehensive Validation**: Built-in validation for all hook types
-- **Structured Logging**: Detailed logging with zap for debugging and monitoring
+- **Validation**: Built-in validation for hook data
+- **Error Handling**: Comprehensive error handling with structured error types
 - **Go Idioms**: Follows Go best practices and conventions
 
 ## Usage
-
-### Constructor Patterns
-
-All constructors follow consistent patterns with logger as the first parameter:
-
-```go
-// Executors
-builtinExecutor := hook.NewBuiltinExecutor(logger)
-scriptExecutor := hook.NewScriptExecutor(logger, "/tmp/hooks")
-regoExecutor := hook.NewRegoExecutor(logger, "/tmp/policies")
-schemaExecutor := hook.NewSchemaExecutor(logger, "/tmp/schemas")
-
-// Processors
-builtinProcessor := hook.NewBuiltinProcessor(logger)
-scriptProcessor := hook.NewScriptProcessor(logger, "/tmp/hooks")
-policyProcessor := hook.NewPolicyProcessor(logger, "/tmp/policies")
-schemaProcessor := hook.NewSchemaProcessor(logger, "/tmp/schemas")
-
-// Validators
-builtinValidator := hook.NewBuiltinValidator()
-scriptValidator := hook.NewScriptValidator("/tmp/hooks")
-policyValidator := hook.NewPolicyValidator("/tmp/policies")
-schemaValidator := hook.NewSchemaValidator("/tmp/schemas")
-```
-
-### Discovery API
-
-All discovery methods support variadic parameters for flexible usage:
-
-```go
-// Discover all items
-allScripts, err := scriptExecutor.discoverScripts(ctx)
-allPolicies, err := regoExecutor.discoverPolicies(ctx)
-allSchemas, err := schemaExecutor.discoverSchemas(ctx)
-
-// Discover specific hook types
-scripts, err := scriptExecutor.discoverScripts(ctx, "before-install")
-policies, err := regoExecutor.discoverPolicies(ctx, "before-install", "after-install")
-schemas, err := schemaExecutor.discoverSchemas(ctx, "before-install")
-```
-
-### File Discovery Patterns
-
-The system supports flexible file discovery with consistent patterns:
-
-#### Directory Structure
-```
-<hookDir>/
-├── <hookType>/          # Directory containing multiple files
-│   ├── file1
-│   ├── file2
-│   └── ...
-└── <hookType>           # Single file named after hook type
-```
-
-#### Script Discovery
-- **Naming**: Files must be named exactly like the hook type (with dashes)
-- **Extension**: No file extension required
-- **Permissions**: Must be executable
-- **Order**: Files in directories are processed in lexicographic order
-
-#### Policy Discovery (Rego)
-- **Naming**: Files must be named exactly like the hook type (with dashes)
-- **Extension**: Must have `.rego` extension
-- **Order**: Files in directories are processed in lexicographic order
-
-#### Schema Discovery (JSON Schema)
-- **Naming**: Files must be named exactly like the hook type (with dashes)
-- **Extension**: Must have `.json` extension
-- **Validation**: Must be valid JSON Schema format
-- **Order**: Files in directories are processed in lexicographic order
 
 ### Basic Hook Processing
 
@@ -128,13 +43,13 @@ import (
 )
 
 func main() {
-    // Create a builtin processor
-    processor := hook.NewBuiltinProcessor(logger)
+    // Create a simple processor with only builtin hooks
+    processor := hook.NewSimpleProcessor(nil)
     ctx := context.Background()
     
     // Register some builtin hooks
-    err := processor.Register("before-install", func(ctx context.Context, data *hook.Data) error {
-        fmt.Printf("Installing extension: %s\n", data.Extension)
+    err := processor.RegisterBuiltin(ctx, "before-install", func(ctx context.Context, data *hook.Data) error {
+        fmt.Printf("Installing extension: %s\n", data.ExtensionName)
         return nil
     })
     if err != nil {
@@ -160,7 +75,7 @@ func fullHookProcessing() {
     logger, _ := zap.NewDevelopment()
     
     // Create a processor with script and policy executors
-    builtinExecutor := hook.NewBuiltinExecutor(logger)
+    builtinExecutor := hook.NewBuiltinExecutor()
     validator := hook.NewValidator()
     scriptExecutor := hook.NewScriptExecutor(logger, "/tmp/hooks")
     regoExecutor := hook.NewRegoExecutor(logger, "/tmp/policies")
@@ -176,8 +91,8 @@ func fullHookProcessing() {
     ctx := context.Background()
     
     // Register builtin hooks
-    processor.Register("before-install", func(ctx context.Context, data *hook.Data) error {
-        logger.Info("Before install hook", zap.String("extension", data.Extension))
+    processor.RegisterBuiltin(ctx, "before-install", func(ctx context.Context, data *hook.Data) error {
+        logger.Info("Before install hook", zap.String("extension", data.ExtensionName))
         return nil
     })
     
@@ -194,60 +109,6 @@ func fullHookProcessing() {
         log.Fatal(err)
     }
 }
-```
-
-### Specialized Processors
-
-The package provides focused processors, one for each executor type, with discovery capabilities:
-
-#### Builtin Processor
-```go
-processor := hook.NewBuiltinProcessor(logger)
-
-// Register builtin hooks
-processor.Register("before-install", func(ctx context.Context, data *hook.Data) error {
-    // Builtin hook logic
-    return nil
-})
-
-// Execute hooks
-err := processor.Execute(ctx, "before-install", hookData)
-```
-
-#### Script Processor
-```go
-processor := hook.NewScriptProcessor(logger, "/tmp/hooks")
-
-// Discover scripts
-scripts, err := processor.ListScripts(ctx, "before-install")
-allScripts, err := processor.DiscoverAllScripts()
-
-// Execute hooks (scripts are automatically discovered)
-err := processor.Execute(ctx, "before-install", hookData)
-```
-
-#### Policy Processor
-```go
-processor := hook.NewPolicyProcessor(logger, "/tmp/policies")
-
-// Discover policies
-policies, err := processor.ListPolicies(ctx, "before-install")
-allPolicies, err := processor.DiscoverAllPolicies()
-
-// Execute hooks (policies are automatically discovered)
-err := processor.Execute(ctx, "before-install", hookData)
-```
-
-#### Schema Processor
-```go
-processor := hook.NewSchemaProcessor(logger, "/tmp/schemas")
-
-// Discover schemas
-schemas, err := processor.ListJSONSchemas(ctx, "before-install")
-allSchemas, err := processor.DiscoverAllJSONSchemas()
-
-// Execute hooks (schemas are automatically discovered)
-err := processor.Execute(ctx, "before-install", hookData)
 ```
 
 ### Processor Types
@@ -404,7 +265,7 @@ err := executor.Execute(ctx, "before-install", hookData)
 Executes Rego policy hooks:
 
 ```go
-executor := hook.NewRegoExecutor("/tmp/policies", logger)
+executor := hook.NewRegoExecutor(logger, "/tmp/policies")
 
 // Policies are automatically discovered from the directory
 // Files should be named like: before-install.rego, after-install.rego, etc.

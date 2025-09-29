@@ -16,11 +16,11 @@ import (
 
 // Extension-specific hook types
 const (
-	HookTypeBeforeInstall   hook.HookType = "extension-before-install"
-	HookTypeAfterInstall    hook.HookType = "extension-after-install"
-	HookTypeBeforeUninstall hook.HookType = "extension-before-uninstall"
-	HookTypeAfterUninstall  hook.HookType = "extension-after-uninstall"
-	HookTypeBeforeRun       hook.HookType = "extension-before-run"
+	HookTypeBeforeInstall   hook.Type = "extension-before-install"
+	HookTypeAfterInstall    hook.Type = "extension-after-install"
+	HookTypeBeforeUninstall hook.Type = "extension-before-uninstall"
+	HookTypeAfterUninstall  hook.Type = "extension-after-uninstall"
+	HookTypeBeforeRun       hook.Type = "extension-before-run"
 )
 
 // Info represents information about an extension
@@ -45,7 +45,7 @@ type Installer struct {
 	configDir string
 	client    *github.Client
 	logger    *zap.Logger
-	hooks     *hook.Manager
+	hooks     *hook.BuiltinProcessor
 }
 
 // InstallerOption defines a functional option for configuring an Installer
@@ -65,8 +65,8 @@ func WithLogger(logger *zap.Logger) InstallerOption {
 	}
 }
 
-// WithHooks sets a custom hook manager
-func WithHooks(hooks *hook.Manager) InstallerOption {
+// WithHooks sets a custom hook processor
+func WithHooks(hooks *hook.BuiltinProcessor) InstallerOption {
 	return func(i *Installer) {
 		i.hooks = hooks
 	}
@@ -78,8 +78,8 @@ func NewInstaller(configDir string, opts ...InstallerOption) *Installer {
 	client := github.NewClient(nil)
 	logger := zap.L()
 
-	// Create default hook manager
-	hooks := hook.New()
+	// Create default hook processor
+	hooks := hook.NewBuiltinProcessor(logger)
 
 	installer := &Installer{
 		configDir: configDir,
@@ -139,14 +139,9 @@ func (i *Installer) InstallExtension(ctx context.Context, owner, repo string) er
 		zap.String("repo", repo))
 
 	// Execute before install hooks
-	hookData := &hook.HookData{
-		ExtensionName: repo,
-		ExtensionPath: "",
-		Metadata: map[string]interface{}{
-			"owner": owner,
-			"repo":  repo,
-		},
-	}
+	hookData := hook.NewData(HookTypeBeforeInstall, repo).
+		WithMetadata("owner", owner).
+		WithMetadata("repo", repo)
 
 	if err := i.hooks.Execute(ctx, HookTypeBeforeInstall, hookData); err != nil {
 		i.logger.Error("Before install hook failed", zap.Error(err))
@@ -195,8 +190,11 @@ func (i *Installer) InstallExtension(ctx context.Context, owner, repo string) er
 		zap.String("path", binaryPath))
 
 	// Execute after install hooks
-	hookData.ExtensionPath = binaryPath
-	if err := i.hooks.Execute(ctx, HookTypeAfterInstall, hookData); err != nil {
+	afterHookData := hook.NewData(HookTypeAfterInstall, repo).
+		WithMetadata("owner", owner).
+		WithMetadata("repo", repo).
+		WithMetadata("path", binaryPath)
+	if err := i.hooks.Execute(ctx, HookTypeAfterInstall, afterHookData); err != nil {
 		i.logger.Error("After install hook failed", zap.Error(err))
 		// Don't fail the installation if after hooks fail
 	}
@@ -219,14 +217,10 @@ func (i *Installer) RemoveExtension(ctx context.Context, name string) error {
 	}
 
 	// Execute before uninstall hooks
-	hookData := &hook.HookData{
-		ExtensionName: name,
-		ExtensionPath: ext.Path,
-		Metadata: map[string]interface{}{
-			"version":    ext.Version,
-			"repository": ext.Repository,
-		},
-	}
+	hookData := hook.NewData(HookTypeBeforeUninstall, name).
+		WithMetadata("version", ext.Version).
+		WithMetadata("repository", ext.Repository).
+		WithMetadata("path", ext.Path)
 
 	if err := i.hooks.Execute(ctx, HookTypeBeforeUninstall, hookData); err != nil {
 		i.logger.Error("Before uninstall hook failed", zap.Error(err))
@@ -249,7 +243,10 @@ func (i *Installer) RemoveExtension(ctx context.Context, name string) error {
 	i.logger.Info("Extension removed successfully", zap.String("name", name))
 
 	// Execute after uninstall hooks
-	if err := i.hooks.Execute(ctx, HookTypeAfterUninstall, hookData); err != nil {
+	afterHookData := hook.NewData(HookTypeAfterUninstall, name).
+		WithMetadata("version", ext.Version).
+		WithMetadata("repository", ext.Repository)
+	if err := i.hooks.Execute(ctx, HookTypeAfterUninstall, afterHookData); err != nil {
 		i.logger.Error("After uninstall hook failed", zap.Error(err))
 		// Don't fail the removal if after hooks fail
 	}

@@ -39,16 +39,16 @@ func (p *Prompt) AskStringWithDefault(question, defaultValue string) (string, er
 	if defaultValue != "" {
 		question = fmt.Sprintf("%s [%s]", question, defaultValue)
 	}
-	
+
 	answer, err := p.AskString(question)
 	if err != nil {
 		return "", err
 	}
-	
+
 	if answer == "" {
 		return defaultValue, nil
 	}
-	
+
 	return answer, nil
 }
 
@@ -56,10 +56,15 @@ func (p *Prompt) AskStringWithDefault(question, defaultValue string) (string, er
 func (p *Prompt) AskInt(question string) (int, error) {
 	answer, err := p.AskString(question)
 	if err != nil {
-		return 0, err
+		return 0, NewInputFailedError(question, answer, err)
 	}
-	
-	return strconv.Atoi(answer)
+
+	value, err := strconv.Atoi(answer)
+	if err != nil {
+		return 0, NewInvalidNumberError(answer, question, err)
+	}
+
+	return value, nil
 }
 
 // AskIntWithDefault asks for an integer input with a default value
@@ -67,14 +72,19 @@ func (p *Prompt) AskIntWithDefault(question string, defaultValue int) (int, erro
 	question = fmt.Sprintf("%s [%d]", question, defaultValue)
 	answer, err := p.AskString(question)
 	if err != nil {
-		return 0, err
+		return 0, NewInputFailedError(question, answer, err)
 	}
-	
+
 	if answer == "" {
 		return defaultValue, nil
 	}
-	
-	return strconv.Atoi(answer)
+
+	value, err := strconv.Atoi(answer)
+	if err != nil {
+		return 0, NewInvalidNumberError(answer, question, err)
+	}
+
+	return value, nil
 }
 
 // AskBool asks for a boolean input (y/n)
@@ -83,7 +93,7 @@ func (p *Prompt) AskBool(question string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	
+
 	answer = strings.ToLower(strings.TrimSpace(answer))
 	return answer == "y" || answer == "yes", nil
 }
@@ -94,17 +104,17 @@ func (p *Prompt) AskBoolWithDefault(question string, defaultValue bool) (bool, e
 	if defaultValue {
 		defaultStr = "y"
 	}
-	
+
 	question = fmt.Sprintf("%s (y/n) [%s]", question, defaultStr)
 	answer, err := p.AskString(question)
 	if err != nil {
 		return false, err
 	}
-	
+
 	if answer == "" {
 		return defaultValue, nil
 	}
-	
+
 	answer = strings.ToLower(strings.TrimSpace(answer))
 	return answer == "y" || answer == "yes", nil
 }
@@ -112,77 +122,77 @@ func (p *Prompt) AskBoolWithDefault(question string, defaultValue bool) (bool, e
 // AskSelect asks for a selection from a list
 func (p *Prompt) AskSelect(question string, options []string) (string, error) {
 	if len(options) == 0 {
-		return "", fmt.Errorf("no options provided")
+		return "", NewNoOptionsError(question)
 	}
-	
+
 	fmt.Println(question)
 	for i, option := range options {
 		fmt.Printf("  %d) %s\n", i+1, option)
 	}
-	
+
 	answer, err := p.AskString("Enter your choice (number):")
 	if err != nil {
-		return "", err
+		return "", NewInputFailedError(question, answer, err)
 	}
-	
+
 	choice, err := strconv.Atoi(answer)
 	if err != nil {
-		return "", fmt.Errorf("invalid choice: %s", answer)
+		return "", NewInvalidChoiceError(0, len(options), options, question)
 	}
-	
+
 	if choice < 1 || choice > len(options) {
-		return "", fmt.Errorf("choice out of range: %d", choice)
+		return "", NewChoiceOutOfRangeError(choice, len(options), options, question)
 	}
-	
+
 	return options[choice-1], nil
 }
 
 // AskMultiSelect asks for multiple selections from a list
 func (p *Prompt) AskMultiSelect(question string, options []string) ([]string, error) {
 	if len(options) == 0 {
-		return nil, fmt.Errorf("no options provided")
+		return nil, NewNoOptionsError(question)
 	}
-	
+
 	fmt.Println(question)
 	for i, option := range options {
 		fmt.Printf("  %d) %s\n", i+1, option)
 	}
-	
+
 	answer, err := p.AskString("Enter your choices (comma-separated numbers):")
 	if err != nil {
 		return nil, err
 	}
-	
+
 	choices := strings.Split(answer, ",")
 	var selected []string
-	
+
 	for _, choiceStr := range choices {
 		choice, err := strconv.Atoi(strings.TrimSpace(choiceStr))
 		if err != nil {
 			return nil, fmt.Errorf("invalid choice: %s", choiceStr)
 		}
-		
+
 		if choice < 1 || choice > len(options) {
 			return nil, fmt.Errorf("choice out of range: %d", choice)
 		}
-		
+
 		selected = append(selected, options[choice-1])
 	}
-	
+
 	return selected, nil
 }
 
 // AskPassword asks for a password input (hidden)
 func (p *Prompt) AskPassword(question string) (string, error) {
 	fmt.Print(question + " ")
-	
+
 	// For now, just read normally - in a real implementation,
 	// you'd want to hide the input
 	text, err := p.reader.ReadString('\n')
 	if err != nil {
 		return "", err
 	}
-	
+
 	return strings.TrimSpace(text), nil
 }
 
