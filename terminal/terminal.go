@@ -5,6 +5,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/charmbracelet/x/term"
 )
 
 // Terminal represents terminal capabilities
@@ -225,4 +227,31 @@ func (t *Terminal) Cyan(text string) string {
 // Gray returns gray colored text
 func (t *Terminal) Gray(text string) string {
 	return t.Colorize(text, ColorGray)
+}
+
+// State represents terminal state for restoration
+type State struct {
+	state *term.State
+}
+
+// MakeRaw puts the terminal into raw mode
+func MakeRaw(fd uintptr) (*State, error) {
+	state, err := term.MakeRaw(fd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make terminal raw: %w", err)
+	}
+	return &State{state: state}, nil
+}
+
+// Restore restores the terminal to its original state
+func Restore(fd uintptr, state *State) error {
+	if state == nil || state.state == nil {
+		return nil
+	}
+	return term.Restore(fd, state.state)
+}
+
+// IsTerminal checks if the file descriptor is a terminal
+func IsTerminal(fd uintptr) bool {
+	return term.IsTerminal(fd)
 }

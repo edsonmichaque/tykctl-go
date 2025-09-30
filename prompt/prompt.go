@@ -4,28 +4,95 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/edsonmichaque/tykctl-go/terminal"
 )
 
 // Prompt represents an interactive prompt
 type Prompt struct {
-	terminal *terminal.Terminal
-	reader   *bufio.Reader
+	terminal      *terminal.Terminal
+	reader        *bufio.Reader
+	originalState *terminal.State
+	restored      bool
 }
 
 // New creates a new prompt instance
 func New() *Prompt {
-	return &Prompt{
+	p := &Prompt{
 		terminal: terminal.New(),
 		reader:   bufio.NewReader(os.Stdin),
 	}
+	
+	// Set up signal handlers for cleanup
+	p.setupSignalHandlers()
+	
+	return p
+}
+
+// setupSignalHandlers sets up signal handlers to ensure terminal cleanup on exit
+func (p *Prompt) setupSignalHandlers() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
+	
+	go func() {
+		<-c
+		p.Cleanup()
+		os.Exit(1)
+	}()
+}
+
+// SaveState saves the current terminal state
+func (p *Prompt) SaveState() error {
+	if !terminal.IsTerminal(os.Stdin.Fd()) {
+		return nil // Not a terminal, nothing to save
+	}
+	
+	state, err := terminal.MakeRaw(os.Stdin.Fd())
+	if err != nil {
+		return fmt.Errorf("failed to save terminal state: %w", err)
+	}
+	
+	p.originalState = state
+	return nil
+}
+
+// RestoreState restores the terminal to its original state
+func (p *Prompt) RestoreState() error {
+	if p.restored || p.originalState == nil {
+		return nil // Already restored or nothing to restore
+	}
+	
+	if !terminal.IsTerminal(os.Stdin.Fd()) {
+		return nil // Not a terminal, nothing to restore
+	}
+	
+	if err := terminal.Restore(os.Stdin.Fd(), p.originalState); err != nil {
+		return fmt.Errorf("failed to restore terminal state: %w", err)
+	}
+	
+	p.restored = true
+	return nil
+}
+
+// Cleanup ensures terminal state is restored (safe to call multiple times)
+func (p *Prompt) Cleanup() {
+	p.RestoreState()
 }
 
 // AskString asks for a string input
 func (p *Prompt) AskString(question string) (string, error) {
+	// Save terminal state before prompting
+	if err := p.SaveState(); err != nil {
+		return "", fmt.Errorf("failed to save terminal state: %w", err)
+	}
+	
+	// Ensure cleanup happens
+	defer p.Cleanup()
+	
 	fmt.Print(question + " ")
 	text, err := p.reader.ReadString('\n')
 	if err != nil {
