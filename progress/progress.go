@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -66,30 +65,14 @@ func (s *Spinner) WithContext(ctx context.Context, message string, fn func() err
 	s.done = false
 	s.mu.Unlock()
 
-	// Create internal spinner model
-	model := &spinnerModel{
-		spinner: s,
-		done:    false,
-	}
+	// Start spinner in background
+	stop := make(chan struct{})
+	go s.run(stop)
 
-	// Create a new program
-	p := tea.NewProgram(model, tea.WithOutput(os.Stderr))
-
-	// Run the function in a goroutine
+	// Run the function
 	errChan := make(chan error, 1)
 	go func() {
 		errChan <- fn()
-		s.mu.Lock()
-		s.done = true
-		model.done = true
-		s.mu.Unlock()
-	}()
-
-	// Start the spinner
-	go func() {
-		if _, err := p.Run(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error running spinner: %v\n", err)
-		}
 	}()
 
 	// Wait for completion or context cancellation
@@ -97,14 +80,16 @@ func (s *Spinner) WithContext(ctx context.Context, message string, fn func() err
 	case err := <-errChan:
 		s.mu.Lock()
 		s.done = true
-		model.done = true
 		s.mu.Unlock()
+		close(stop)
+		s.clearLine()
 		return err
 	case <-ctx.Done():
 		s.mu.Lock()
 		s.done = true
-		model.done = true
 		s.mu.Unlock()
+		close(stop)
+		s.clearLine()
 		return ctx.Err()
 	}
 }
@@ -146,32 +131,16 @@ func (b *Bar) WithContext(ctx context.Context, message string, total int64, fn f
 	b.done = false
 	b.mu.Unlock()
 
-	// Create internal progress bar model
-	model := &barModel{
-		bar:  b,
-		done: false,
-	}
+	// Start progress bar in background
+	stop := make(chan struct{})
+	go b.run(stop)
 
-	// Create a new program
-	p := tea.NewProgram(model, tea.WithOutput(os.Stderr))
-
-	// Run the function in a goroutine
+	// Run the function
 	errChan := make(chan error, 1)
 	go func() {
 		errChan <- fn(func(inc int64) {
 			b.Add(inc)
 		})
-		b.mu.Lock()
-		b.done = true
-		model.done = true
-		b.mu.Unlock()
-	}()
-
-	// Start the progress bar
-	go func() {
-		if _, err := p.Run(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error running progress bar: %v\n", err)
-		}
 	}()
 
 	// Wait for completion or context cancellation
@@ -179,120 +148,109 @@ func (b *Bar) WithContext(ctx context.Context, message string, total int64, fn f
 	case err := <-errChan:
 		b.mu.Lock()
 		b.done = true
-		model.done = true
 		b.mu.Unlock()
+		close(stop)
+		b.clearLine()
 		return err
 	case <-ctx.Done():
 		b.mu.Lock()
 		b.done = true
-		model.done = true
 		b.mu.Unlock()
+		close(stop)
+		b.clearLine()
 		return ctx.Err()
 	}
 }
 
-// Internal models that implement tea.Model interface
-// These are not exposed to the public API
+// run runs the spinner animation
+func (s *Spinner) run(stop <-chan struct{}) {
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
 
-type spinnerModel struct {
-	spinner *Spinner
-	done    bool
-}
-
-func (m *spinnerModel) Init() tea.Cmd {
-	return tea.Tick(time.Millisecond*100, func(t time.Time) tea.Msg {
-		return tickMsg{}
-	})
-}
-
-func (m *spinnerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tickMsg:
-		if m.done {
-			return m, tea.Quit
-		}
-		m.spinner.mu.Lock()
-		m.spinner.index = (m.spinner.index + 1) % len(m.spinner.frames)
-		m.spinner.mu.Unlock()
-		return m, tea.Tick(time.Millisecond*100, func(t time.Time) tea.Msg {
-			return tickMsg{}
-		})
-	case tea.KeyMsg:
-		if msg.Type == tea.KeyCtrlC {
-			return m, tea.Quit
+	for {
+		select {
+		case <-stop:
+			return
+		case <-ticker.C:
+			s.mu.Lock()
+			if s.done {
+				s.mu.Unlock()
+				return
+			}
+			s.index = (s.index + 1) % len(s.frames)
+			s.mu.Unlock()
+			s.render()
 		}
 	}
-	return m, nil
 }
 
-func (m *spinnerModel) View() string {
-	if m.done {
-		return ""
-	}
-	m.spinner.mu.Lock()
-	defer m.spinner.mu.Unlock()
-	return fmt.Sprintf("%s %s", m.spinner.frames[m.spinner.index], m.spinner.message)
-}
+// run runs the progress bar animation
+func (b *Bar) run(stop <-chan struct{}) {
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
 
-type barModel struct {
-	bar  *Bar
-	done bool
-}
-
-func (m *barModel) Init() tea.Cmd {
-	return tea.Tick(time.Millisecond*50, func(t time.Time) tea.Msg {
-		return tickMsg{}
-	})
-}
-
-func (m *barModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tickMsg:
-		if m.done {
-			return m, tea.Quit
-		}
-		return m, tea.Tick(time.Millisecond*50, func(t time.Time) tea.Msg {
-			return tickMsg{}
-		})
-	case tea.KeyMsg:
-		if msg.Type == tea.KeyCtrlC {
-			return m, tea.Quit
+	for {
+		select {
+		case <-stop:
+			return
+		case <-ticker.C:
+			b.mu.Lock()
+			if b.done {
+				b.mu.Unlock()
+				return
+			}
+			b.mu.Unlock()
+			b.render()
 		}
 	}
-	return m, nil
 }
 
-func (m *barModel) View() string {
-	if m.done {
-		return ""
-	}
-	m.bar.mu.Lock()
-	defer m.bar.mu.Unlock()
+// render renders the spinner
+func (s *Spinner) render() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	
+	// Clear the line and print spinner
+	fmt.Fprintf(os.Stderr, "\r%s %s", s.frames[s.index], s.message)
+}
 
-	if m.bar.total <= 0 {
-		return fmt.Sprintf("%s: %d", m.bar.message, m.bar.current)
+// render renders the progress bar
+func (b *Bar) render() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if b.total <= 0 {
+		fmt.Fprintf(os.Stderr, "\r%s: %d", b.message, b.current)
+		return
 	}
 
-	percent := float64(m.bar.current) / float64(m.bar.total)
-	filled := int(float64(m.bar.width) * percent)
-	empty := m.bar.width - filled
+	percent := float64(b.current) / float64(b.total)
+	filled := int(float64(b.width) * percent)
+	empty := b.width - filled
 
 	bar := ""
 	for i := 0; i < filled; i++ {
-		bar += m.bar.fillChar
+		bar += b.fillChar
 	}
 	for i := 0; i < empty; i++ {
-		bar += m.bar.emptyChar
+		bar += b.emptyChar
 	}
 
 	style := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-	return fmt.Sprintf("%s: %s %d/%d (%.1f%%)",
-		m.bar.message,
+	fmt.Fprintf(os.Stderr, "\r%s: %s %d/%d (%.1f%%)",
+		b.message,
 		style.Render(bar),
-		m.bar.current,
-		m.bar.total,
+		b.current,
+		b.total,
 		percent*100)
 }
 
-// tickMsg is a message sent on each tick
-type tickMsg struct{}
+// clearLine clears the current line
+func (s *Spinner) clearLine() {
+	fmt.Fprintf(os.Stderr, "\r%s", "\033[2K")
+}
+
+// clearLine clears the current line
+func (b *Bar) clearLine() {
+	fmt.Fprintf(os.Stderr, "\r%s", "\033[2K")
+}
