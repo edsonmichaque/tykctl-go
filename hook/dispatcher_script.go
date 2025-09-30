@@ -9,16 +9,16 @@ import (
 	"go.uber.org/zap"
 )
 
-// ScriptProcessor handles only script hooks with script-specific functionality.
-type ScriptProcessor struct {
+// ScriptDispatcher handles only script hooks with script-specific functionality.
+type ScriptDispatcher struct {
 	scriptExecutor *ScriptExecutor
 	validator      Validator
 	logger         *zap.Logger
 }
 
-// NewScriptProcessor creates a new script-only processor.
-func NewScriptProcessor(logger *zap.Logger, scriptDir string) *ScriptProcessor {
-	return &ScriptProcessor{
+// NewScriptDispatcher creates a new script-only dispatcher.
+func NewScriptDispatcher(logger *zap.Logger, scriptDir string) *ScriptDispatcher {
+	return &ScriptDispatcher{
 		scriptExecutor: NewScriptExecutor(logger, scriptDir),
 		validator:      NewScriptValidator(scriptDir),
 		logger:         logger,
@@ -26,7 +26,7 @@ func NewScriptProcessor(logger *zap.Logger, scriptDir string) *ScriptProcessor {
 }
 
 // Execute executes only script hooks.
-func (sp *ScriptProcessor) Execute(ctx context.Context, hookType Type, data *Data) error {
+func (sp *ScriptDispatcher) Execute(ctx context.Context, hookType Type, data *Data) error {
 	// Validate hook data
 	if err := sp.validator.Validate(data); err != nil {
 		return fmt.Errorf("hook validation failed: %w", err)
@@ -48,13 +48,13 @@ func (sp *ScriptProcessor) Execute(ctx context.Context, hookType Type, data *Dat
 }
 
 // GetScriptExecutor returns the underlying script executor for advanced usage.
-func (sp *ScriptProcessor) GetScriptExecutor() *ScriptExecutor {
+func (sp *ScriptDispatcher) GetScriptExecutor() *ScriptExecutor {
 	return sp.scriptExecutor
 }
 
 // ListScripts returns a list of available script files for a given hook type.
-// This method adds processor-level validation and error handling.
-func (sp *ScriptProcessor) ListScripts(ctx context.Context, hookType Type) ([]string, error) {
+// This method adds dispatcher-level validation and error handling.
+func (sp *ScriptDispatcher) ListScripts(ctx context.Context, hookType Type) ([]string, error) {
 	if sp.scriptExecutor == nil {
 		return nil, fmt.Errorf("script executor not available")
 	}
@@ -81,8 +81,8 @@ func (sp *ScriptProcessor) ListScripts(ctx context.Context, hookType Type) ([]st
 }
 
 // DiscoverAllScripts discovers all scripts in the script directory.
-// This method adds processor-level logging and error handling.
-func (sp *ScriptProcessor) DiscoverAllScripts() (map[Type][]string, error) {
+// This method adds dispatcher-level logging and error handling.
+func (sp *ScriptDispatcher) DiscoverAllScripts() (map[Type][]string, error) {
 	if sp.scriptExecutor == nil {
 		return nil, fmt.Errorf("script executor not available")
 	}
@@ -112,8 +112,8 @@ func (sp *ScriptProcessor) DiscoverAllScripts() (map[Type][]string, error) {
 }
 
 // CountScripts returns the count of discovered scripts for a hook type.
-// This method adds processor-level validation and logging.
-func (sp *ScriptProcessor) CountScripts(ctx context.Context, hookType Type) int {
+// This method adds dispatcher-level validation and logging.
+func (sp *ScriptDispatcher) CountScripts(ctx context.Context, hookType Type) int {
 	if sp.scriptExecutor == nil {
 		return 0
 	}
@@ -147,8 +147,8 @@ func (sp *ScriptProcessor) CountScripts(ctx context.Context, hookType Type) int 
 }
 
 // ValidateScript validates a script file without executing it.
-// This method adds processor-level validation logic.
-func (sp *ScriptProcessor) ValidateScript(ctx context.Context, scriptFile string) error {
+// This method adds dispatcher-level validation logic.
+func (sp *ScriptDispatcher) ValidateScript(ctx context.Context, scriptFile string) error {
 	if sp.scriptExecutor == nil {
 		return fmt.Errorf("script executor not available")
 	}
@@ -178,8 +178,8 @@ func (sp *ScriptProcessor) ValidateScript(ctx context.Context, scriptFile string
 }
 
 // GetScriptDirectory returns the script directory path.
-// This method adds processor-level validation.
-func (sp *ScriptProcessor) GetScriptDirectory() string {
+// This method adds dispatcher-level validation.
+func (sp *ScriptDispatcher) GetScriptDirectory() string {
 	if sp.scriptExecutor == nil {
 		return ""
 	}

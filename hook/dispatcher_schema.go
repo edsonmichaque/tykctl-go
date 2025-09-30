@@ -7,16 +7,16 @@ import (
 	"go.uber.org/zap"
 )
 
-// SchemaProcessor handles only JSON Schema validation hooks with schema-specific functionality.
-type SchemaProcessor struct {
+// SchemaDispatcher handles only JSON Schema validation hooks with schema-specific functionality.
+type SchemaDispatcher struct {
 	schemaExecutor *SchemaExecutor
 	validator      Validator
 	logger         *zap.Logger
 }
 
-// NewSchemaProcessor creates a new JSON Schema-only processor.
-func NewSchemaProcessor(logger *zap.Logger, schemaDir string) *SchemaProcessor {
-	return &SchemaProcessor{
+// NewSchemaDispatcher creates a new JSON Schema-only dispatcher.
+func NewSchemaDispatcher(logger *zap.Logger, schemaDir string) *SchemaDispatcher {
+	return &SchemaDispatcher{
 		schemaExecutor: NewSchemaExecutor(logger, schemaDir),
 		validator:      NewSchemaValidator(schemaDir),
 		logger:         logger,
@@ -24,7 +24,7 @@ func NewSchemaProcessor(logger *zap.Logger, schemaDir string) *SchemaProcessor {
 }
 
 // Execute executes only JSON Schema validation hooks.
-func (sp *SchemaProcessor) Execute(ctx context.Context, hookType Type, data *Data) error {
+func (sp *SchemaDispatcher) Execute(ctx context.Context, hookType Type, data *Data) error {
 	// Validate hook data
 	if err := sp.validator.Validate(data); err != nil {
 		return fmt.Errorf("hook validation failed: %w", err)
@@ -46,12 +46,12 @@ func (sp *SchemaProcessor) Execute(ctx context.Context, hookType Type, data *Dat
 }
 
 // GetSchemaExecutor returns the underlying JSON Schema executor for advanced usage.
-func (sp *SchemaProcessor) GetSchemaExecutor() *SchemaExecutor {
+func (sp *SchemaDispatcher) GetSchemaExecutor() *SchemaExecutor {
 	return sp.schemaExecutor
 }
 
 // ValidateJSONSchema validates a JSON Schema file without executing hooks.
-func (sp *SchemaProcessor) ValidateJSONSchema(ctx context.Context, schemaFile string) error {
+func (sp *SchemaDispatcher) ValidateJSONSchema(ctx context.Context, schemaFile string) error {
 	if sp.schemaExecutor == nil {
 		return fmt.Errorf("JSON schema executor not available")
 	}
@@ -62,8 +62,8 @@ func (sp *SchemaProcessor) ValidateJSONSchema(ctx context.Context, schemaFile st
 }
 
 // ListJSONSchemas returns a list of available JSON Schema files for a given hook type.
-// This method adds processor-level validation and error handling.
-func (sp *SchemaProcessor) ListJSONSchemas(ctx context.Context, hookType Type) ([]string, error) {
+// This method adds dispatcher-level validation and error handling.
+func (sp *SchemaDispatcher) ListJSONSchemas(ctx context.Context, hookType Type) ([]string, error) {
 	if sp.schemaExecutor == nil {
 		return nil, fmt.Errorf("schema executor not available")
 	}
@@ -90,8 +90,8 @@ func (sp *SchemaProcessor) ListJSONSchemas(ctx context.Context, hookType Type) (
 }
 
 // DiscoverAllJSONSchemas discovers all available JSON Schema files.
-// This method adds processor-level validation and error handling.
-func (sp *SchemaProcessor) DiscoverAllJSONSchemas() (map[Type][]string, error) {
+// This method adds dispatcher-level validation and error handling.
+func (sp *SchemaDispatcher) DiscoverAllJSONSchemas() (map[Type][]string, error) {
 	if sp.schemaExecutor == nil {
 		return nil, fmt.Errorf("schema executor not available")
 	}
@@ -121,8 +121,8 @@ func (sp *SchemaProcessor) DiscoverAllJSONSchemas() (map[Type][]string, error) {
 }
 
 // CountJSONSchemas returns the count of available JSON Schema files for a given hook type.
-// This method adds processor-level validation and error handling.
-func (sp *SchemaProcessor) CountJSONSchemas(ctx context.Context, hookType Type) (int, error) {
+// This method adds dispatcher-level validation and error handling.
+func (sp *SchemaDispatcher) CountJSONSchemas(ctx context.Context, hookType Type) (int, error) {
 	if sp.schemaExecutor == nil {
 		return 0, fmt.Errorf("schema executor not available")
 	}
@@ -149,7 +149,7 @@ func (sp *SchemaProcessor) CountJSONSchemas(ctx context.Context, hookType Type) 
 }
 
 // ReloadJSONSchemas reloads all JSON schemas from the schema directory.
-func (sp *SchemaProcessor) ReloadJSONSchemas(ctx context.Context) error {
+func (sp *SchemaDispatcher) ReloadJSONSchemas(ctx context.Context) error {
 	if sp.schemaExecutor == nil {
 		return fmt.Errorf("JSON schema executor not available")
 	}
@@ -158,8 +158,8 @@ func (sp *SchemaProcessor) ReloadJSONSchemas(ctx context.Context) error {
 }
 
 // GetJSONSchemaDirectory returns the JSON schema directory path.
-// This method adds processor-level validation and error handling.
-func (sp *SchemaProcessor) GetJSONSchemaDirectory() (string, error) {
+// This method adds dispatcher-level validation and error handling.
+func (sp *SchemaDispatcher) GetJSONSchemaDirectory() (string, error) {
 	if sp.schemaExecutor == nil {
 		return "", fmt.Errorf("schema executor not available")
 	}
@@ -176,7 +176,7 @@ func (sp *SchemaProcessor) GetJSONSchemaDirectory() (string, error) {
 }
 
 // GetJSONSchemaForHookType returns the JSON schema for a specific hook type.
-func (sp *SchemaProcessor) GetJSONSchemaForHookType(hookType Type) (map[string]interface{}, error) {
+func (sp *SchemaDispatcher) GetJSONSchemaForHookType(hookType Type) (map[string]interface{}, error) {
 	if sp.schemaExecutor == nil {
 		return nil, fmt.Errorf("JSON schema executor not available")
 	}
@@ -191,7 +191,7 @@ func (sp *SchemaProcessor) GetJSONSchemaForHookType(hookType Type) (map[string]i
 }
 
 // ValidateDataAgainstJSONSchema validates data against a specific JSON schema.
-func (sp *SchemaProcessor) ValidateDataAgainstJSONSchema(ctx context.Context, data *Data, schema map[string]interface{}) error {
+func (sp *SchemaDispatcher) ValidateDataAgainstJSONSchema(ctx context.Context, data *Data, schema map[string]interface{}) error {
 	if sp.schemaExecutor == nil {
 		return fmt.Errorf("JSON schema executor not available")
 	}

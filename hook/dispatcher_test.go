@@ -5,29 +5,29 @@ import (
 	"testing"
 )
 
-func TestNewBuiltinProcessor(t *testing.T) {
-	processor := NewBuiltinProcessor(nil)
-	if processor == nil {
-		t.Fatal("NewBuiltinProcessor() returned nil")
+func TestNewBuiltinDispatcher(t *testing.T) {
+	dispatcher := NewBuiltinDispatcher(nil)
+	if dispatcher == nil {
+		t.Fatal("NewBuiltinDispatcher() returned nil")
 	}
 
 	// Test internal fields directly
-	if processor.builtinExecutor == nil {
+	if dispatcher.builtinExecutor == nil {
 		t.Error("Builtin executor should not be nil")
 	}
 
-	if processor.validator == nil {
+	if dispatcher.validator == nil {
 		t.Error("Validator should not be nil")
 	}
 }
 
-func TestProcessorExecute(t *testing.T) {
-	processor := NewBuiltinProcessor(nil)
+func TestDispatcherExecute(t *testing.T) {
+	dispatcher := NewBuiltinDispatcher(nil)
 	ctx := context.Background()
 
 	// Register a test hook
 	hookExecuted := false
-	err := processor.Register("before-install", func(ctx context.Context, data *Data) error {
+	err := dispatcher.Register("before-install", func(ctx context.Context, data *Data) error {
 		hookExecuted = true
 		return nil
 	})
@@ -39,7 +39,7 @@ func TestProcessorExecute(t *testing.T) {
 	hookData := NewData("before-install", "test-extension")
 
 	// Execute hooks
-	err = processor.Execute(ctx, "before-install", hookData)
+	err = dispatcher.Execute(ctx, "before-install", hookData)
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
@@ -49,15 +49,15 @@ func TestProcessorExecute(t *testing.T) {
 	}
 }
 
-func TestProcessorExecuteWithValidation(t *testing.T) {
-	processor := NewBuiltinProcessor(nil)
+func TestDispatcherExecuteWithValidation(t *testing.T) {
+	dispatcher := NewBuiltinDispatcher(nil)
 	ctx := context.Background()
 
 	// Test with invalid data (empty extension name)
 	hookData := NewData("before-install", "")
 
 	// Execute should fail due to validation
-	err := processor.Execute(ctx, "before-install", hookData)
+	err := dispatcher.Execute(ctx, "before-install", hookData)
 	if err == nil {
 		t.Error("Expected validation error, got nil")
 	}
@@ -65,7 +65,7 @@ func TestProcessorExecuteWithValidation(t *testing.T) {
 	// Test with valid data
 	hookData = NewData("before-install", "test-extension")
 
-	err = processor.Execute(ctx, "before-install", hookData)
+	err = dispatcher.Execute(ctx, "before-install", hookData)
 	if err != nil {
 		t.Fatalf("Execute failed with valid data: %v", err)
 	}
@@ -171,43 +171,43 @@ func TestHookDataBuilder(t *testing.T) {
 	}
 }
 
-func TestProcessorBuiltinHookManagement(t *testing.T) {
-	processor := NewBuiltinProcessor(nil)
+func TestDispatcherBuiltinHookManagement(t *testing.T) {
+	dispatcher := NewBuiltinDispatcher(nil)
 
 	// Test registering hooks
 	hook1 := func(ctx context.Context, data *Data) error { return nil }
 	hook2 := func(ctx context.Context, data *Data) error { return nil }
 
-	err := processor.Register("before-install", hook1)
+	err := dispatcher.Register("before-install", hook1)
 	if err != nil {
 		t.Fatalf("Failed to register first hook: %v", err)
 	}
 
-	err = processor.Register("before-install", hook2)
+	err = dispatcher.Register("before-install", hook2)
 	if err != nil {
 		t.Fatalf("Failed to register second hook: %v", err)
 	}
 
 	// Test counting hooks
-	count := processor.CountBuiltinHooks("before-install")
+	count := dispatcher.CountBuiltinHooks("before-install")
 	if count != 2 {
 		t.Errorf("Expected 2 hooks, got %d", count)
 	}
 
 	// Test listing hook types
-	types := processor.ListBuiltinHooks()
+	types := dispatcher.ListBuiltinHooks()
 	if len(types) != 1 || types[0] != "before-install" {
 		t.Errorf("Expected [before-install], got %v", types)
 	}
 
 	// Test unregistering a hook
-	err = processor.Unregister("before-install", hook1)
+	err = dispatcher.Unregister("before-install", hook1)
 	if err != nil {
 		t.Fatalf("Failed to unregister hook: %v", err)
 	}
 
 	// Test counting after unregister
-	count = processor.CountBuiltinHooks("before-install")
+	count = dispatcher.CountBuiltinHooks("before-install")
 	if count != 1 {
 		t.Errorf("Expected 1 hook after unregister, got %d", count)
 	}

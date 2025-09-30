@@ -7,16 +7,16 @@ import (
 	"go.uber.org/zap"
 )
 
-// PolicyProcessor handles only Rego policy hooks with policy-specific functionality.
-type PolicyProcessor struct {
+// PolicyDispatcher handles only Rego policy hooks with policy-specific functionality.
+type PolicyDispatcher struct {
 	regoExecutor *RegoExecutor
 	validator    Validator
 	logger       *zap.Logger
 }
 
-// NewPolicyProcessor creates a new policy-only processor.
-func NewPolicyProcessor(logger *zap.Logger, policyDir string) *PolicyProcessor {
-	return &PolicyProcessor{
+// NewPolicyDispatcher creates a new policy-only dispatcher.
+func NewPolicyDispatcher(logger *zap.Logger, policyDir string) *PolicyDispatcher {
+	return &PolicyDispatcher{
 		regoExecutor: NewRegoExecutor(logger, policyDir),
 		validator:    NewPolicyValidator(policyDir),
 		logger:       logger,
@@ -24,7 +24,7 @@ func NewPolicyProcessor(logger *zap.Logger, policyDir string) *PolicyProcessor {
 }
 
 // Execute executes only Rego policy hooks.
-func (pp *PolicyProcessor) Execute(ctx context.Context, hookType Type, data *Data) error {
+func (pp *PolicyDispatcher) Execute(ctx context.Context, hookType Type, data *Data) error {
 	// Validate hook data
 	if err := pp.validator.Validate(data); err != nil {
 		return fmt.Errorf("hook validation failed: %w", err)
@@ -46,12 +46,12 @@ func (pp *PolicyProcessor) Execute(ctx context.Context, hookType Type, data *Dat
 }
 
 // GetRegoExecutor returns the underlying Rego executor for advanced usage.
-func (pp *PolicyProcessor) GetRegoExecutor() *RegoExecutor {
+func (pp *PolicyDispatcher) GetRegoExecutor() *RegoExecutor {
 	return pp.regoExecutor
 }
 
 // ValidatePolicy validates a policy file without executing hooks.
-func (pp *PolicyProcessor) ValidatePolicy(ctx context.Context, policyFile string) error {
+func (pp *PolicyDispatcher) ValidatePolicy(ctx context.Context, policyFile string) error {
 	if pp.regoExecutor == nil {
 		return fmt.Errorf("rego executor not available")
 	}
@@ -62,8 +62,8 @@ func (pp *PolicyProcessor) ValidatePolicy(ctx context.Context, policyFile string
 }
 
 // ListPolicies returns a list of available policy files for a given hook type.
-// This method adds processor-level validation and error handling.
-func (pp *PolicyProcessor) ListPolicies(ctx context.Context, hookType Type) ([]string, error) {
+// This method adds dispatcher-level validation and error handling.
+func (pp *PolicyDispatcher) ListPolicies(ctx context.Context, hookType Type) ([]string, error) {
 	if pp.regoExecutor == nil {
 		return nil, fmt.Errorf("rego executor not available")
 	}
@@ -90,8 +90,8 @@ func (pp *PolicyProcessor) ListPolicies(ctx context.Context, hookType Type) ([]s
 }
 
 // DiscoverAllPolicies discovers all available policy files.
-// This method adds processor-level validation and error handling.
-func (pp *PolicyProcessor) DiscoverAllPolicies() (map[Type][]string, error) {
+// This method adds dispatcher-level validation and error handling.
+func (pp *PolicyDispatcher) DiscoverAllPolicies() (map[Type][]string, error) {
 	if pp.regoExecutor == nil {
 		return nil, fmt.Errorf("rego executor not available")
 	}
@@ -121,8 +121,8 @@ func (pp *PolicyProcessor) DiscoverAllPolicies() (map[Type][]string, error) {
 }
 
 // CountPolicies returns the count of available policy files for a given hook type.
-// This method adds processor-level validation and error handling.
-func (pp *PolicyProcessor) CountPolicies(ctx context.Context, hookType Type) (int, error) {
+// This method adds dispatcher-level validation and error handling.
+func (pp *PolicyDispatcher) CountPolicies(ctx context.Context, hookType Type) (int, error) {
 	if pp.regoExecutor == nil {
 		return 0, fmt.Errorf("rego executor not available")
 	}
@@ -149,8 +149,8 @@ func (pp *PolicyProcessor) CountPolicies(ctx context.Context, hookType Type) (in
 }
 
 // GetPolicyDirectory returns the policy directory path.
-// This method adds processor-level validation and error handling.
-func (pp *PolicyProcessor) GetPolicyDirectory() (string, error) {
+// This method adds dispatcher-level validation and error handling.
+func (pp *PolicyDispatcher) GetPolicyDirectory() (string, error) {
 	if pp.regoExecutor == nil {
 		return "", fmt.Errorf("rego executor not available")
 	}
