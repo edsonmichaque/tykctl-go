@@ -93,7 +93,7 @@ func NewDirLoader(dir, name string, resolver *Resolver) *DirLoader {
 func (d *DirLoader) Load(ctx context.Context) (*Template, error) {
 	select {
 	case <-ctx.Done():
-		return nil, fmt.Errorf("context cancelled: dirloader load")
+		return nil, fmt.Errorf("context cancelled: directory loader load")
 	default:
 	}
 
