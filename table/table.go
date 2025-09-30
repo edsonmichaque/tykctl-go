@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"strings"
-	"text/tabwriter"
 
 	"github.com/edsonmichaque/tykctl-go/terminal"
 	"github.com/olekukonko/tablewriter/tw"
@@ -157,20 +156,17 @@ func (t *Table) Render() error {
 
 // renderWithoutBorders renders the table without borders (default behavior)
 func (t *Table) renderWithoutBorders() error {
-	// Create tabwriter for formatted output with better alignment
-	// Use more aggressive settings: minwidth=1, tabwidth=8, padding=1
-	// FilterHTML flag handles ANSI escape sequences properly
-	w := tabwriter.NewWriter(t.output, 1, 8, 1, ' ', tabwriter.FilterHTML)
-	defer w.Flush()
+	// Calculate column widths first
+	t.calculateColumnWidths()
 
 	// Render headers
-	if err := t.renderHeaders(w); err != nil {
+	if err := t.renderSimpleHeaders(); err != nil {
 		return err
 	}
 
 	// Render rows
 	for _, row := range t.rows {
-		if err := t.renderRow(w, row); err != nil {
+		if err := t.renderSimpleRow(row); err != nil {
 			return err
 		}
 	}
@@ -208,7 +204,57 @@ func (t *Table) renderWithBorders() error {
 	return t.renderBottomBorder()
 }
 
-// renderHeaders renders the table headers
+// renderSimpleHeaders renders headers with manual column alignment
+func (t *Table) renderSimpleHeaders() error {
+	var parts []string
+	for i, header := range t.headers {
+		headerText := strings.ToUpper(header)
+		coloredHeader := t.terminal.Blue(headerText)
+
+		if i < len(t.widths) {
+			// Pad to column width, accounting for visible text length only
+			padding := t.widths[i] - len(headerText)
+			if padding > 0 {
+				parts = append(parts, coloredHeader+strings.Repeat(" ", padding))
+			} else {
+				parts = append(parts, coloredHeader)
+			}
+		} else {
+			parts = append(parts, coloredHeader)
+		}
+	}
+
+	_, err := fmt.Fprintln(t.output, strings.Join(parts, "  "))
+	return err
+}
+
+// renderSimpleRow renders a data row with manual column alignment
+func (t *Table) renderSimpleRow(row []string) error {
+	var parts []string
+	for i := 0; i < len(t.headers); i++ {
+		var cell string
+		if i < len(row) {
+			cell = row[i]
+		}
+
+		if i < len(t.widths) {
+			// Pad to column width
+			padding := t.widths[i] - len(cell)
+			if padding > 0 {
+				parts = append(parts, cell+strings.Repeat(" ", padding))
+			} else {
+				parts = append(parts, cell)
+			}
+		} else {
+			parts = append(parts, cell)
+		}
+	}
+
+	_, err := fmt.Fprintln(t.output, strings.Join(parts, "  "))
+	return err
+}
+
+// renderHeaders renders the table headers (legacy tabwriter method)
 func (t *Table) renderHeaders(w io.Writer) error {
 	headerRow := make([]string, len(t.headers))
 	for i, header := range t.headers {
