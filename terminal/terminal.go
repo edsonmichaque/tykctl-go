@@ -229,37 +229,6 @@ func (t *Terminal) Gray(text string) string {
 	return t.Colorize(text, ColorGray)
 }
 
-// State represents terminal state for restoration
-type State struct {
-	state *term.State
-}
-
-// MakeRaw puts the terminal into raw mode
-func MakeRaw(fd uintptr) (*State, error) {
-	state, err := term.MakeRaw(fd)
-	if err != nil {
-		return nil, fmt.Errorf("failed to make terminal raw: %w", err)
-	}
-	return &State{state: state}, nil
-}
-
-// SaveState saves the current terminal state without changing it
-func SaveState(fd uintptr) (*State, error) {
-	state, err := term.GetState(fd)
-	if err != nil {
-		return nil, fmt.Errorf("failed to save terminal state: %w", err)
-	}
-	return &State{state: state}, nil
-}
-
-// Restore restores the terminal to its original state
-func Restore(fd uintptr, state *State) error {
-	if state == nil || state.state == nil {
-		return nil
-	}
-	return term.Restore(fd, state.state)
-}
-
 // IsTerminal checks if the file descriptor is a terminal
 func IsTerminal(fd uintptr) bool {
 	return term.IsTerminal(fd)
