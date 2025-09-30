@@ -822,10 +822,22 @@ func (l *Loader) unmarshalConfig(config Config, target interface{}) error {
 		return configurable.Configure(config)
 	}
 
-	// For basic types, try to extract values using reflection
-	// This is a simplified implementation - in practice, you'd use a proper
-	// configuration library like viper or mapstructure
-	return fmt.Errorf("unmarshaling not implemented for type %T", target)
+	// For now, just set defaults and validate
+	// TODO: Implement proper unmarshaling from Config interface
+	
+	// Set defaults if the target implements DefaultSetter
+	if setter, ok := target.(DefaultSetter); ok {
+		setter.SetDefaults()
+	}
+
+	// Validate if the target implements Validator
+	if validator, ok := target.(Validator); ok {
+		if err := validator.Validate(); err != nil {
+			return fmt.Errorf("configuration validation failed: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func (l *Loader) unmarshalFromCache(cached interface{}, target interface{}) error {
