@@ -84,6 +84,11 @@ func isValidBuiltinHookType(hookType Type) bool {
 		"after-uninstall":  true,
 		"before-update":    true,
 		"after-update":     true,
+		// Auth hooks
+		"before-login":     true,
+		"after-login":      true,
+		"before-logout":    true,
+		"after-logout":     true,
 	}
 	return validTypes[hookType]
 }
