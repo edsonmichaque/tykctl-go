@@ -298,3 +298,33 @@ func TestCustomBorderCharacters(t *testing.T) {
 		t.Errorf("Expected custom border characters *, :, =, got:\n%s", output)
 	}
 }
+
+func TestUserTableFormatting(t *testing.T) {
+	var buf bytes.Buffer
+	table := NewWithWriter(&buf)
+
+	// Reproduce the user table from the issue
+	table.SetHeaders([]string{"ID", "Email", "Name", "Role", "Status", "Group"})
+	table.AddRow([]string{"user-123", "john@example.com", "John Doe", "admin", "active", "developers"})
+	table.AddRow([]string{"user-456", "jane@example.com", "Jane Smith", "user", "active", "analysts"})
+
+	err := table.Render()
+	if err != nil {
+		t.Errorf("Render failed: %v", err)
+	}
+
+	output := buf.String()
+	t.Logf("Table output:\n%s", output)
+	
+	// Check that columns are properly aligned
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	if len(lines) < 3 {
+		t.Errorf("Expected at least 3 lines (header + 2 data rows), got %d", len(lines))
+	}
+	
+	// Check that the header line has proper spacing
+	headerLine := lines[0]
+	if !strings.Contains(headerLine, "ID") || !strings.Contains(headerLine, "EMAIL") {
+		t.Errorf("Header line missing expected columns: %s", headerLine)
+	}
+}

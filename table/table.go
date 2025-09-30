@@ -79,6 +79,35 @@ func (t *Table) AddRow(row []string) {
 	}
 }
 
+// calculateColumnWidths calculates optimal column widths for better alignment
+func (t *Table) calculateColumnWidths() {
+	if len(t.headers) == 0 {
+		return
+	}
+	
+	// Initialize widths with header lengths
+	t.widths = make([]int, len(t.headers))
+	for i, header := range t.headers {
+		t.widths[i] = len(header)
+	}
+	
+	// Update widths based on data rows
+	for _, row := range t.rows {
+		for i, cell := range row {
+			if i < len(t.widths) && len(cell) > t.widths[i] {
+				t.widths[i] = len(cell)
+			}
+		}
+	}
+	
+	// Ensure minimum width for better readability
+	for i := range t.widths {
+		if t.widths[i] < 3 {
+			t.widths[i] = 3
+		}
+	}
+}
+
 // AddRows adds multiple rows to the table
 func (t *Table) AddRows(rows [][]string) {
 	for _, row := range rows {
@@ -110,8 +139,12 @@ func (t *Table) Render() error {
 
 // renderWithoutBorders renders the table without borders (default behavior)
 func (t *Table) renderWithoutBorders() error {
-	// Create tabwriter for formatted output
-	w := tabwriter.NewWriter(t.output, 0, 0, 2, ' ', 0)
+	// Calculate optimal column widths
+	t.calculateColumnWidths()
+	
+	// Create tabwriter for formatted output with better alignment
+	// minwidth=0, tabwidth=0, padding=2, padchar=' ', flags=0
+	w := tabwriter.NewWriter(t.output, 0, 0, 2, ' ', tabwriter.TabIndent)
 	defer w.Flush()
 
 	// Render headers
@@ -163,7 +196,13 @@ func (t *Table) renderWithBorders() error {
 func (t *Table) renderHeaders(w io.Writer) error {
 	headerRow := make([]string, len(t.headers))
 	for i, header := range t.headers {
-		headerRow[i] = t.terminal.Blue(strings.ToUpper(header))
+		// Format header with proper width and color
+		formattedHeader := t.terminal.Blue(strings.ToUpper(header))
+		if i < len(t.widths) {
+			headerRow[i] = fmt.Sprintf("%-*s", t.widths[i], formattedHeader)
+		} else {
+			headerRow[i] = formattedHeader
+		}
 	}
 
 	_, err := fmt.Fprintln(w, strings.Join(headerRow, t.separator))
@@ -172,13 +211,22 @@ func (t *Table) renderHeaders(w io.Writer) error {
 
 // renderRow renders a table row
 func (t *Table) renderRow(w io.Writer, row []string) error {
-	// Pad row to match header length
+	// Pad row to match header length with proper formatting
 	paddedRow := make([]string, len(t.headers))
 	for i := 0; i < len(t.headers); i++ {
 		if i < len(row) {
-			paddedRow[i] = row[i]
+			cell := row[i]
+			if i < len(t.widths) {
+				paddedRow[i] = fmt.Sprintf("%-*s", t.widths[i], cell)
+			} else {
+				paddedRow[i] = cell
+			}
 		} else {
-			paddedRow[i] = ""
+			if i < len(t.widths) {
+				paddedRow[i] = fmt.Sprintf("%-*s", t.widths[i], "")
+			} else {
+				paddedRow[i] = ""
+			}
 		}
 	}
 
