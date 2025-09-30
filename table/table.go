@@ -158,8 +158,9 @@ func (t *Table) Render() error {
 // renderWithoutBorders renders the table without borders (default behavior)
 func (t *Table) renderWithoutBorders() error {
 	// Create tabwriter for formatted output with better alignment
-	// minwidth=0, tabwidth=0, padding=2, padchar=' ', flags=tabwriter.FilterHTML to handle ANSI codes
-	w := tabwriter.NewWriter(t.output, 0, 0, 2, ' ', tabwriter.FilterHTML)
+	// Use more aggressive settings: minwidth=1, tabwidth=8, padding=1
+	// FilterHTML flag handles ANSI escape sequences properly
+	w := tabwriter.NewWriter(t.output, 1, 8, 1, ' ', tabwriter.FilterHTML)
 	defer w.Flush()
 
 	// Render headers
@@ -211,7 +212,7 @@ func (t *Table) renderWithBorders() error {
 func (t *Table) renderHeaders(w io.Writer) error {
 	headerRow := make([]string, len(t.headers))
 	for i, header := range t.headers {
-		// Use plain text headers for tabwriter alignment
+		// Apply color to headers
 		headerRow[i] = t.terminal.Blue(strings.ToUpper(header))
 	}
 
