@@ -18,14 +18,14 @@ type ContextStore struct {
 	mu         sync.RWMutex
 }
 
-// ContextStoreOptions provides configuration for the context store
-type ContextStoreOptions struct {
+// ContextOptions provides configuration for the context store
+type ContextOptions struct {
 	ConfigPath string
 	Logger     Logger
 }
 
 // NewContextStore creates a new context store
-func NewContextStore(opts ContextStoreOptions) (*ContextStore, error) {
+func NewContextStore(opts ContextOptions) (*ContextStore, error) {
 	cs := &ContextStore{
 		contexts:   make(map[string]*Context),
 		configPath: opts.ConfigPath,
@@ -106,7 +106,7 @@ func (cs *ContextStore) SwitchContext(name string) error {
 	}
 
 	cs.current = name
-	
+
 	// Save the current context
 	if err := cs.saveContexts(); err != nil {
 		return fmt.Errorf("failed to save current context: %w", err)
@@ -301,7 +301,7 @@ func (cs *ContextStore) MigrateContext(oldContext map[string]interface{}) (*Cont
 // Helper functions
 func (cs *ContextStore) loadContexts() error {
 	contextsFile := filepath.Join(cs.configPath, "contexts.json")
-	
+
 	if _, err := os.Stat(contextsFile); os.IsNotExist(err) {
 		// Create contexts directory if it doesn't exist
 		if err := os.MkdirAll(cs.configPath, 0755); err != nil {
@@ -316,7 +316,7 @@ func (cs *ContextStore) loadContexts() error {
 	}
 
 	var contextsData struct {
-		Current  string             `json:"current"`
+		Current  string              `json:"current"`
 		Contexts map[string]*Context `json:"contexts"`
 	}
 
@@ -334,7 +334,7 @@ func (cs *ContextStore) saveContexts() error {
 	contextsFile := filepath.Join(cs.configPath, "contexts.json")
 
 	contextsData := struct {
-		Current  string             `json:"current"`
+		Current  string              `json:"current"`
 		Contexts map[string]*Context `json:"contexts"`
 	}{
 		Current:  cs.current,

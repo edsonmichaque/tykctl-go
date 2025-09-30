@@ -96,7 +96,7 @@ func main() {
     ctx := context.Background()
     
     // Create context store
-    ctxStore, err := config.NewContextStore(config.ContextStoreOptions{
+    ctxStore, err := config.NewContextStore(config.ContextOptions{
         ConfigPath: "~/.tykctl/contexts",
         Logger:     logger,
     })

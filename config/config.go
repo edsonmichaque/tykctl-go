@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -54,16 +55,16 @@ type Config interface {
 
 // ConfigMetadata provides configuration metadata
 type ConfigMetadata struct {
-	Version     string            `json:"version"`
-	LoadedAt    time.Time         `json:"loaded_at"`
-	Sources     []ConfigSource    `json:"sources"`
-	Validators  []string          `json:"validators"`
-	Extensions  map[string]string `json:"extensions"`
+	Version    string            `json:"version"`
+	LoadedAt   time.Time         `json:"loaded_at"`
+	Sources    []ConfigSource    `json:"sources"`
+	Validators []string          `json:"validators"`
+	Extensions map[string]string `json:"extensions"`
 }
 
 // ConfigSource represents a configuration source
 type ConfigSource struct {
-	Type     string    `json:"type"`     // file, env, remote, etc.
+	Type     string    `json:"type"` // file, env, remote, etc.
 	Path     string    `json:"path"`
 	Priority int       `json:"priority"`
 	LoadedAt time.Time `json:"loaded_at"`
@@ -167,10 +168,10 @@ type Context struct {
 
 // ContextResources represents resources for a context
 type ContextResources struct {
-	Hooks     map[string][]Hook     `json:"hooks"`
-	Plugins   []Plugin              `json:"plugins"`
-	Templates []Template            `json:"templates"`
-	Cache     []CacheConfig         `json:"cache"`
+	Hooks     map[string][]Hook `json:"hooks"`
+	Plugins   []Plugin          `json:"plugins"`
+	Templates []Template        `json:"templates"`
+	Cache     []CacheConfig     `json:"cache"`
 }
 
 // Logger interface for structured logging
@@ -221,7 +222,7 @@ type Loader struct {
 	mu         sync.RWMutex
 	configs    map[string]Config
 	lastReload time.Time
-	
+
 	// Configurable properties
 	envPrefix     string
 	configFormats []string
@@ -231,21 +232,21 @@ type Loader struct {
 
 // LoaderOptions provides configuration for the loader
 type LoaderOptions struct {
-	Extension       string
-	Context         string
-	CacheEnabled    bool
-	CacheTTL        time.Duration
-	LogLevel        LogLevel
-	MetricsEnabled  bool
-	Validators      []Validator
-	Loaders         []ConfigLoader
-	ReloadInterval  time.Duration
-	
+	Extension      string
+	Context        string
+	CacheEnabled   bool
+	CacheTTL       time.Duration
+	LogLevel       LogLevel
+	MetricsEnabled bool
+	Validators     []Validator
+	Loaders        []ConfigLoader
+	ReloadInterval time.Duration
+
 	// Configurable properties
-	EnvPrefix       string   // Environment variable prefix (default: TYKCTL)
-	ConfigFormats   []string // Supported config formats (default: ["yaml", "json", "toml"])
-	ConfigPaths     []string // Additional config paths
-	ContextPaths    []string // Context-specific paths
+	EnvPrefix     string   // Environment variable prefix (default: TYKCTL)
+	ConfigFormats []string // Supported config formats (default: ["yaml", "json", "toml"])
+	ConfigPaths   []string // Additional config paths
+	ContextPaths  []string // Context-specific paths
 }
 
 // NewLoader creates a new enhanced configuration loader
@@ -257,7 +258,7 @@ func NewLoader(ctx context.Context, opts LoaderOptions) (*Loader, error) {
 		configs:    make(map[string]Config),
 		validators: opts.Validators,
 		loaders:    opts.Loaders,
-		
+
 		// Set configurable properties with defaults
 		envPrefix:     getEnvPrefix(opts.EnvPrefix, opts.Extension),
 		configFormats: getConfigFormats(opts.ConfigFormats),
@@ -577,21 +578,21 @@ func getConfigPaths(paths []string, extension string) []string {
 	if len(paths) == 0 {
 		// Default paths
 		paths = []string{
-			"/etc/tykctl",                                    // System-wide
-			filepath.Join(xdg.ConfigHome, "tykctl"),          // XDG config
-			filepath.Join(os.Getenv("HOME"), ".tykctl"),      // User home
-			".",                                              // Current directory
-			".tykctl",                                        // Project config
+			"/etc/tykctl",                               // System-wide
+			filepath.Join(xdg.ConfigHome, "tykctl"),     // XDG config
+			filepath.Join(os.Getenv("HOME"), ".tykctl"), // User home
+			".",       // Current directory
+			".tykctl", // Project config
 		}
 	}
-	
+
 	// Add extension-specific paths
 	if extension != "" {
 		for _, path := range paths {
 			paths = append(paths, filepath.Join(path, extension))
 		}
 	}
-	
+
 	return paths
 }
 
@@ -604,43 +605,340 @@ func getContextPaths(paths []string, context string) []string {
 			"./.tykctl/contexts",
 		}
 	}
-	
+
 	// Add context-specific paths
 	if context != "" {
 		for _, path := range paths {
 			paths = append(paths, filepath.Join(path, context))
 		}
 	}
-	
+
 	return paths
+}
+
+// basicConfig is a simple implementation of the Config interface
+type basicConfig struct {
+	path   string
+	format string
+	data   map[string]interface{}
+	mu     sync.RWMutex
+}
+
+// Implement Config interface
+func (c *basicConfig) Get(key string) interface{} {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.data[key]
+}
+
+func (c *basicConfig) Set(key string, value interface{}) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.data[key] = value
+}
+
+func (c *basicConfig) Has(key string) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	_, exists := c.data[key]
+	return exists
+}
+
+func (c *basicConfig) GetString(key string) string {
+	if val := c.Get(key); val != nil {
+		if str, ok := val.(string); ok {
+			return str
+		}
+	}
+	return ""
+}
+
+func (c *basicConfig) GetInt(key string) int {
+	if val := c.Get(key); val != nil {
+		if i, ok := val.(int); ok {
+			return i
+		}
+	}
+	return 0
+}
+
+func (c *basicConfig) GetBool(key string) bool {
+	if val := c.Get(key); val != nil {
+		if b, ok := val.(bool); ok {
+			return b
+		}
+	}
+	return false
+}
+
+func (c *basicConfig) GetDuration(key string) time.Duration {
+	if val := c.Get(key); val != nil {
+		if d, ok := val.(time.Duration); ok {
+			return d
+		}
+		if str, ok := val.(string); ok {
+			if d, err := time.ParseDuration(str); err == nil {
+				return d
+			}
+		}
+	}
+	return 0
+}
+
+func (c *basicConfig) Validate() error {
+	// Basic validation - can be extended
+	return nil
+}
+
+func (c *basicConfig) ValidateWithContext(ctx context.Context) error {
+	// Basic validation with context - can be extended
+	return nil
+}
+
+func (c *basicConfig) GetMetadata() ConfigMetadata {
+	return ConfigMetadata{
+		Version:    "1.0.0",
+		LoadedAt:   time.Now(),
+		Sources:    []ConfigSource{c.GetSource()},
+		Validators: []string{},
+		Extensions: map[string]string{
+			"format": c.format,
+		},
+	}
+}
+
+func (c *basicConfig) GetSource() ConfigSource {
+	return ConfigSource{
+		Type: "file",
+		Path: c.path,
+	}
+}
+
+func (c *basicConfig) Reload() error {
+	// Reload from file - simplified implementation
+	return nil
+}
+
+func (c *basicConfig) Watch(ctx context.Context) <-chan ConfigChange {
+	// Watch for changes - simplified implementation
+	changes := make(chan ConfigChange)
+	go func() {
+		defer close(changes)
+		<-ctx.Done()
+	}()
+	return changes
+}
+
+func (c *basicConfig) Close() error {
+	// Cleanup - simplified implementation
+	return nil
 }
 
 // Placeholder implementations for missing methods
 func (l *Loader) loadFromSources(ctx context.Context) (Config, error) {
-	// Placeholder implementation
-	return nil, fmt.Errorf("not implemented")
+	// Try to load from all available sources
+	for _, loader := range l.loaders {
+		config, err := loader.Load(ctx, l.extension)
+		if err == nil && config != nil {
+			return config, nil
+		}
+		// Log error but continue with other loaders
+		if l.logger != nil {
+			l.logger.Debug("Failed to load config from loader", "loader", loader.GetName(), "error", err)
+		}
+	}
+
+	// If no loaders succeeded, try to load from file system
+	return l.loadFromFileSystem(ctx)
+}
+
+// loadFromFileSystem attempts to load configuration from the file system
+func (l *Loader) loadFromFileSystem(ctx context.Context) (Config, error) {
+	// Get all possible config paths
+	paths := getConfigPaths(l.configPaths, l.extension)
+
+	// Look for config files in each path
+	for _, path := range paths {
+		// Check each supported format
+		for _, format := range l.configFormats {
+			configFile := filepath.Join(path, fmt.Sprintf("config.%s", format))
+
+			// Check if file exists
+			if _, err := os.Stat(configFile); err == nil {
+				// Found a config file, try to load it
+				config, err := l.loadConfigFile(ctx, configFile, format)
+				if err == nil {
+					return config, nil
+				}
+				// Log error but continue with other files
+				if l.logger != nil {
+					l.logger.Debug("Failed to load config file", "file", configFile, "error", err)
+				}
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("no configuration found in any of the search paths")
+}
+
+// loadConfigFile loads a configuration file
+func (l *Loader) loadConfigFile(ctx context.Context, filePath, format string) (Config, error) {
+	// This is a simplified implementation
+	// In practice, you'd use a proper configuration library like viper
+	// to handle different formats (YAML, JSON, TOML, etc.)
+
+	// For now, return a basic implementation
+	return &basicConfig{
+		path:   filePath,
+		format: format,
+		data:   make(map[string]interface{}),
+	}, nil
 }
 
 func (l *Loader) validateConfig(ctx context.Context, config Config) error {
-	// Placeholder implementation
+	// Run all validators
+	for _, validator := range l.validators {
+		if err := validator.Validate(); err != nil {
+			return fmt.Errorf("validation failed: %w", err)
+		}
+	}
+
+	// Validate the config itself
+	if err := config.Validate(); err != nil {
+		return fmt.Errorf("config validation failed: %w", err)
+	}
+
+	// Validate with context if supported
+	if err := config.ValidateWithContext(ctx); err != nil {
+		return fmt.Errorf("context validation failed: %w", err)
+	}
+
 	return nil
 }
 
 func (l *Loader) unmarshalConfig(config Config, target interface{}) error {
-	// Placeholder implementation
-	return nil
+	// Check if target implements Configurable interface
+	if configurable, ok := target.(Configurable); ok {
+		return configurable.Configure(config)
+	}
+
+	// For basic types, try to extract values using reflection
+	// This is a simplified implementation - in practice, you'd use a proper
+	// configuration library like viper or mapstructure
+	return fmt.Errorf("unmarshaling not implemented for type %T", target)
 }
 
 func (l *Loader) unmarshalFromCache(cached interface{}, target interface{}) error {
-	// Placeholder implementation
-	return nil
+	// If cached is already the target type, copy it
+	if reflect.TypeOf(cached) == reflect.TypeOf(target) {
+		reflect.ValueOf(target).Elem().Set(reflect.ValueOf(cached).Elem())
+		return nil
+	}
+
+	// Try to convert using type assertion
+	if config, ok := cached.(Config); ok {
+		return l.unmarshalConfig(config, target)
+	}
+
+	// For other types, try JSON marshaling/unmarshaling
+	// This is a fallback for simple types
+	return fmt.Errorf("cache unmarshaling not implemented for type %T", cached)
 }
 
 func (l *Loader) checkForChanges(ctx context.Context, changes chan<- ConfigChange) error {
-	// Placeholder implementation
+	// Check if any config files have been modified
+	for name, config := range l.configs {
+		// Get the source of the config
+		source := config.GetSource()
+		if source.Path == "" {
+			continue // Skip configs without file sources
+		}
+
+		// Check file modification time
+		info, err := os.Stat(source.Path)
+		if err != nil {
+			continue // Skip if file doesn't exist or can't be stat'd
+		}
+
+		// If file was modified after last reload, send a change event
+		if info.ModTime().After(l.lastReload) {
+			change := ConfigChange{
+				Key:       name,
+				OldValue:  nil, // We don't store old values
+				NewValue:  config,
+				Source:    source.Path,
+				Timestamp: info.ModTime(),
+			}
+
+			select {
+			case changes <- change:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+	}
+
 	return nil
 }
 
 func (l *Loader) startReloadTimer(interval time.Duration) {
-	// Placeholder implementation
+	if interval <= 0 {
+		return // No reload timer needed
+	}
+
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				// Check for changes and reload if necessary
+				changes := make(chan ConfigChange, 10)
+				go func() {
+					defer close(changes)
+					if err := l.checkForChanges(l.ctx, changes); err != nil {
+						if l.logger != nil {
+							l.logger.Error("Error checking for changes", "error", err)
+						}
+					}
+				}()
+
+				// Process any changes
+				for change := range changes {
+					if l.logger != nil {
+						l.logger.Info("Config changed", "key", change.Key, "source", change.Source)
+					}
+
+					// Update the config in the map
+					l.mu.Lock()
+					if config, ok := change.NewValue.(Config); ok {
+						l.configs[change.Key] = config
+					}
+					l.lastReload = time.Now()
+					l.mu.Unlock()
+				}
+
+			case <-l.ctx.Done():
+				return
+			}
+		}
+	}()
+}
+
+// GetConfigHome returns the primary configuration home directory
+// This follows the standard precedence: XDG_CONFIG_HOME > HOME/.tykctl > current directory
+func GetConfigHome() string {
+	// Check XDG_CONFIG_HOME first
+	if xdgConfigHome := xdg.ConfigHome; xdgConfigHome != "" {
+		return filepath.Join(xdgConfigHome, "tykctl")
+	}
+
+	// Fall back to HOME/.tykctl
+	if home := os.Getenv("HOME"); home != "" {
+		return filepath.Join(home, ".tykctl")
+	}
+
+	// Last resort: current directory
+	return ".tykctl"
 }

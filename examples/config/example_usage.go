@@ -11,12 +11,12 @@ import (
 
 // ExampleConfig represents a sample configuration struct
 type ExampleConfig struct {
-	URL         string        `mapstructure:"url" validate:"required,url"`
-	Token       string        `mapstructure:"token" validate:"required,min_length=10"`
-	MaxTokens   int           `mapstructure:"max_tokens" validate:"range=1,10000"`
-	Temperature float64       `mapstructure:"temperature" validate:"range=0,2"`
-	CacheEnabled bool         `mapstructure:"cache_enabled"`
-	CacheTTL    time.Duration `mapstructure:"cache_ttl"`
+	URL          string        `mapstructure:"url" validate:"required,url"`
+	Token        string        `mapstructure:"token" validate:"required,min_length=10"`
+	MaxTokens    int           `mapstructure:"max_tokens" validate:"range=1,10000"`
+	Temperature  float64       `mapstructure:"temperature" validate:"range=0,2"`
+	CacheEnabled bool          `mapstructure:"cache_enabled"`
+	CacheTTL     time.Duration `mapstructure:"cache_ttl"`
 }
 
 // SetDefaults implements DefaultSetter interface
@@ -82,7 +82,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	ctxStore, err := config.NewContextStore(config.ContextStoreOptions{
+	ctxStore, err := config.NewContextStore(config.ContextOptions{
 		ConfigPath: "/tmp/tykctl-contexts",
 		Logger:     logger,
 	})
@@ -127,7 +127,7 @@ func main() {
 
 	// Example 3: Resource discovery
 	fmt.Println("\n=== Example 3: Resource Discovery ===")
-	
+
 	// Discover hooks
 	hooks, err := loader.DiscoverHooks(ctx, config.HookFilter{
 		Events: []string{"pre-command", "post-command"},
@@ -166,11 +166,11 @@ func main() {
 		CacheTTL:       10 * time.Minute,
 		LogLevel:       config.LogLevelDebug,
 		MetricsEnabled: true,
-		
+
 		// Custom properties
-		EnvPrefix:     "MYAPP",                    // Custom env prefix: MYAPP_*
-		ConfigFormats: []string{"yaml", "json"},   // Only YAML and JSON
-		ConfigPaths:   []string{"/custom/path"},   // Additional config paths
+		EnvPrefix:     "MYAPP",                     // Custom env prefix: MYAPP_*
+		ConfigFormats: []string{"yaml", "json"},    // Only YAML and JSON
+		ConfigPaths:   []string{"/custom/path"},    // Additional config paths
 		ContextPaths:  []string{"/custom/context"}, // Additional context paths
 	})
 	if err != nil {

@@ -82,7 +82,7 @@ The package is now ready for integration into TykCtl extensions and applications
 import "github.com/edsonmichaque/tykctl-go/config"
 
 // Create context store
-ctxStore, err := config.NewContextStore(config.ContextStoreOptions{
+ctxStore, err := config.NewContextStore(config.ContextOptions{
     ConfigPath: "~/.tykctl/contexts",
     Logger:     logger,
 })

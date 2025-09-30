@@ -10,12 +10,12 @@ import (
 
 // ExampleConfig represents a sample configuration struct
 type ExampleConfig struct {
-	URL        string        `mapstructure:"url" validate:"required,url"`
-	Token      string        `mapstructure:"token" validate:"required,min_length=10"`
-	MaxTokens  int           `mapstructure:"max_tokens" validate:"range=1,10000"`
-	Temperature float64      `mapstructure:"temperature" validate:"range=0,2"`
-	CacheEnabled bool        `mapstructure:"cache_enabled"`
-	CacheTTL    time.Duration `mapstructure:"cache_ttl"`
+	URL          string        `mapstructure:"url" validate:"required,url"`
+	Token        string        `mapstructure:"token" validate:"required,min_length=10"`
+	MaxTokens    int           `mapstructure:"max_tokens" validate:"range=1,10000"`
+	Temperature  float64       `mapstructure:"temperature" validate:"range=0,2"`
+	CacheEnabled bool          `mapstructure:"cache_enabled"`
+	CacheTTL     time.Duration `mapstructure:"cache_ttl"`
 }
 
 // SetDefaults implements DefaultSetter interface
@@ -111,7 +111,7 @@ func TestBasicUsage(t *testing.T) {
 	} else {
 		fmt.Printf("Found %d templates:\n", len(templates))
 		for _, template := range templates {
-			fmt.Printf("  - %s: %s (type: %s, format: %s)\n", 
+			fmt.Printf("  - %s: %s (type: %s, format: %s)\n",
 				template.Name, template.Path, template.Type, template.Format)
 		}
 	}
@@ -120,7 +120,7 @@ func TestBasicUsage(t *testing.T) {
 // TestContextStore demonstrates context management
 func TestContextStore(t *testing.T) {
 	// Create context store
-	ctxStore, err := NewContextStore(ContextStoreOptions{
+	ctxStore, err := NewContextStore(ContextOptions{
 		ConfigPath: "/tmp/tykctl-contexts",
 		Logger:     &simpleLogger{level: LogLevelInfo, logger: log.New(log.Writer(), "", log.LstdFlags)},
 	})
@@ -161,14 +161,14 @@ func TestContextStore(t *testing.T) {
 		fmt.Printf("Current context: %s\n", currentCtx.Name)
 		fmt.Printf("URL: %v\n", currentCtx.Config["url"])
 		fmt.Printf("Max Tokens: %v\n", currentCtx.Config["max_tokens"])
-		
+
 		// Test GetContextConfig with error handling
 		if url, err := ctxStore.GetContextConfig("dev", "url"); err != nil {
 			log.Printf("Failed to get URL config: %v", err)
 		} else {
 			fmt.Printf("URL from GetContextConfig: %v\n", url)
 		}
-		
+
 		// Test SetContextConfig with error handling
 		if err := ctxStore.SetContextConfig("dev", "new_key", "new_value"); err != nil {
 			log.Printf("Failed to set config: %v", err)
@@ -197,11 +197,11 @@ func TestCustomLoader(t *testing.T) {
 		CacheTTL:       10 * time.Minute,
 		LogLevel:       LogLevelDebug,
 		MetricsEnabled: true,
-		
+
 		// Custom properties
-		EnvPrefix:     "MYAPP",                    // Custom env prefix: MYAPP_*
-		ConfigFormats: []string{"yaml", "json"},   // Only YAML and JSON
-		ConfigPaths:   []string{"/custom/path"},   // Additional config paths
+		EnvPrefix:     "MYAPP",                     // Custom env prefix: MYAPP_*
+		ConfigFormats: []string{"yaml", "json"},    // Only YAML and JSON
+		ConfigPaths:   []string{"/custom/path"},    // Additional config paths
 		ContextPaths:  []string{"/custom/context"}, // Additional context paths
 	})
 	if err != nil {
