@@ -75,20 +75,7 @@ func (v *BuiltinValidator) validateMetadata(metadata map[string]interface{}) err
 
 // isValidBuiltinHookType checks if the hook type is a valid builtin type.
 func isValidBuiltinHookType(hookType Type) bool {
-	validTypes := map[Type]bool{
-		"before-install":   true,
-		"after-install":    true,
-		"before-run":       true,
-		"after-run":        true,
-		"before-uninstall": true,
-		"after-uninstall":  true,
-		"before-update":    true,
-		"after-update":     true,
-		// Auth hooks
-		"before-login":     true,
-		"after-login":      true,
-		"before-logout":    true,
-		"after-logout":     true,
-	}
-	return validTypes[hookType]
+	// Builtin validator should accept any hook type - let the specific
+	// extensions define what hooks they support
+	return true
 }
