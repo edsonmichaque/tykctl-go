@@ -51,7 +51,7 @@ func (p *Prompt) SaveState() error {
 		return nil // Not a terminal, nothing to save
 	}
 	
-	state, err := terminal.MakeRaw(os.Stdin.Fd())
+	state, err := terminal.SaveState(os.Stdin.Fd())
 	if err != nil {
 		return fmt.Errorf("failed to save terminal state: %w", err)
 	}
@@ -251,6 +251,14 @@ func (p *Prompt) AskMultiSelect(question string, options []string) ([]string, er
 
 // AskPassword asks for a password input (hidden)
 func (p *Prompt) AskPassword(question string) (string, error) {
+	// Save terminal state before prompting
+	if err := p.SaveState(); err != nil {
+		return "", fmt.Errorf("failed to save terminal state: %w", err)
+	}
+	
+	// Ensure cleanup happens
+	defer p.Cleanup()
+	
 	fmt.Print(question + " ")
 
 	// For now, just read normally - in a real implementation,

@@ -243,6 +243,15 @@ func MakeRaw(fd uintptr) (*State, error) {
 	return &State{state: state}, nil
 }
 
+// SaveState saves the current terminal state without changing it
+func SaveState(fd uintptr) (*State, error) {
+	state, err := term.GetState(fd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to save terminal state: %w", err)
+	}
+	return &State{state: state}, nil
+}
+
 // Restore restores the terminal to its original state
 func Restore(fd uintptr, state *State) error {
 	if state == nil || state.state == nil {
