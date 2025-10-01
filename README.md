@@ -13,6 +13,7 @@ The documentation is organized in the `docs/` directory:
 - **[API Reference](docs/api/)** - API documentation
 - **[Configuration](docs/config/)** - Configuration management
 - **[Plugin System](docs/plugin/)** - Cross-platform plugin system
+- **[Alias System](docs/alias/)** - Command alias management
 - **[Extension Framework](docs/extension/)** - Extension development
 - **[Development Guide](docs/development.md)** - Contributing guidelines
 
@@ -21,6 +22,7 @@ The documentation is organized in the `docs/` directory:
 - **Extension Management**: Install, manage, and run Tyk CLI extensions
 - **API Client**: HTTP client with retry logic, middleware support, and functional options
 - **Command Framework**: Structured command handling with Cobra integration
+- **Alias System**: Command shortcuts and automation with parameter expansion
 - **File System Utilities**: File watching, operations, and management
 - **Interactive Components**: Prompts, progress indicators, and terminal UI
 - **Hook System**: Event-driven hooks with Rego policy support
@@ -135,6 +137,23 @@ User interaction components for CLI applications.
 import "github.com/TykTechnologies/tykctl-go/prompt"
 
 answer, err := prompt.Ask("What's your name?")
+```
+
+### Alias System (`alias/`)
+Command alias management with parameter expansion and shell integration.
+
+```go
+import "github.com/TykTechnologies/tykctl-go/alias"
+
+// Create alias manager
+provider := alias.NewInMemoryConfigProvider()
+manager := alias.NewManager(provider, []string{"help", "version"})
+
+// Set alias
+err := manager.SetAlias(ctx, "co", "products checkout")
+
+// Execute alias
+err = manager.ExecuteAlias(ctx, "co", []string{"my-product"})
 ```
 
 ### Hook System (`hook/`)
@@ -279,6 +298,7 @@ Detailed documentation is available in the `docs.md` file, which provides compre
 
 - **Extension Discovery**: Search and discover Tyk CLI extensions from GitHub
 - **Extension Management**: Install, uninstall, and manage extensions
+- **Alias System**: Command shortcuts with parameter expansion and shell integration
 - **Hook System**: Event-driven hooks with support for builtin, external, and Rego hooks
 - **Template System**: Pre-built templates for common extension patterns
 - **Rich CLI Components**: Progress indicators, prompts, tables, and terminal UI

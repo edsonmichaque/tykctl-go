@@ -22,6 +22,7 @@ import (
     
     "github.com/edsonmichaque/tykctl-go/config"
     "github.com/edsonmichaque/tykctl-go/plugin"
+    "github.com/edsonmichaque/tykctl-go/alias"
 )
 
 func main() {
@@ -34,19 +35,34 @@ func main() {
     }
     
     // Create plugin manager for your extension
-    manager := plugin.NewManager("my-extension", cfg)
+    pluginManager := plugin.NewManager("my-extension", cfg)
+    
+    // Create alias manager
+    aliasProvider := alias.NewInMemoryConfigProvider()
+    aliasManager := alias.NewManager(aliasProvider, []string{"help", "version"})
     
     // Discover available plugins
-    plugins, err := manager.DiscoverPlugins(ctx)
+    plugins, err := pluginManager.DiscoverPlugins(ctx)
     if err != nil {
         log.Fatal(err)
     }
     
     fmt.Printf("Found %d plugins\n", len(plugins))
     
+    // Set up some useful aliases
+    err = aliasManager.SetAlias(ctx, "co", "products checkout")
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    err = aliasManager.SetAlias(ctx, "deploy", "products deploy $1 --env $2")
+    if err != nil {
+        log.Fatal(err)
+    }
+    
     // Execute a plugin if available
     if len(plugins) > 0 {
-        err = manager.Execute(ctx, plugins[0].Path, []string{"--help"})
+        err = pluginManager.Execute(ctx, plugins[0].Path, []string{"--help"})
         if err != nil {
             log.Fatal(err)
         }
@@ -135,6 +151,93 @@ err := manager.Execute(ctx, "/plugin/dir/tykctl-my-extension-my-plugin", []strin
 
 // Execute with custom timeout
 err := manager.ExecuteWithTimeout(ctx, "/plugin/dir/tykctl-my-extension-my-plugin", []string{"arg1"}, 30*time.Second)
+```
+
+## 🔗 Alias System
+
+### Creating Aliases
+
+Create command shortcuts:
+
+```go
+// Create alias manager
+provider := alias.NewInMemoryConfigProvider()
+manager := alias.NewManager(provider, []string{"help", "version"})
+
+// Simple aliases
+err := manager.SetAlias(ctx, "co", "products checkout")
+err := manager.SetAlias(ctx, "users", "users list")
+
+// Parameterized aliases
+err := manager.SetAlias(ctx, "getuser", "users get $1")
+err := manager.SetAlias(ctx, "deploy", "products deploy $1 --env $2")
+
+// Shell aliases
+err := manager.SetAlias(ctx, "cleanup", "!rm -rf /tmp/tykctl-*")
+err := manager.SetAlias(ctx, "logs", "!tail -f /var/log/tykctl.log")
+```
+
+### Managing Aliases
+
+```go
+// List all aliases
+aliases := manager.ListAliases(ctx)
+for name, expansion := range aliases {
+    fmt.Printf("%s: %s\n", name, expansion)
+}
+
+// Get specific alias
+expansion, exists := manager.GetAlias(ctx, "co")
+if exists {
+    fmt.Printf("co expands to: %s\n", expansion)
+}
+
+// Delete alias
+err := manager.DeleteAlias(ctx, "co")
+```
+
+### Executing Aliases
+
+```go
+// Execute alias with parameters
+err := manager.ExecuteAlias(ctx, "deploy", []string{"my-api", "production"})
+// Expands to: products deploy my-api --env production
+
+// Preview alias expansion
+preview := manager.ExpandAliasPreview("users get $1", []string{"john@example.com"})
+fmt.Printf("Would execute: %s\n", preview)
+```
+
+### Cobra Integration
+
+```go
+import (
+    "github.com/spf13/cobra"
+    "github.com/edsonmichaque/tykctl-go/alias"
+)
+
+func main() {
+    // Create root command
+    rootCmd := &cobra.Command{
+        Use:   "my-extension",
+        Short: "My TykCtl Extension",
+    }
+    
+    // Create alias manager
+    provider := alias.NewInMemoryConfigProvider()
+    manager := alias.NewManager(provider, []string{"help", "version"})
+    
+    // Add alias command
+    builder := alias.NewCommandBuilder(manager)
+    rootCmd.AddCommand(builder.BuildAliasCommand())
+    
+    // Register aliases as subcommands
+    registrar := alias.NewRegistrar(manager)
+    registrar.RegisterAliases(ctx, rootCmd)
+    
+    // Execute
+    rootCmd.Execute()
+}
 ```
 
 ## 🏗️ Extension Development
@@ -292,8 +395,9 @@ func TestPluginDiscovery(t *testing.T) {
 
 1. **Explore the API**: Check out the [API Documentation](../api/README.md)
 2. **Plugin Development**: Learn more in the [Plugin Guide](../plugin/README.md)
-3. **Configuration**: Deep dive into [Configuration Management](../config/README.md)
-4. **Extension Framework**: Build extensions with the [Extension Guide](../extension/README.md)
+3. **Alias System**: Master command shortcuts with the [Alias Guide](../alias/README.md)
+4. **Configuration**: Deep dive into [Configuration Management](../config/README.md)
+5. **Extension Framework**: Build extensions with the [Extension Guide](../extension/README.md)
 
 ## 🆘 Troubleshooting
 

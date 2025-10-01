@@ -10,12 +10,14 @@ Welcome to the TykCtl-Go documentation. This directory contains comprehensive do
 - **[Configuration Management](config/)** - Configuration system, environment variables, and discovery
 - **[Plugin System](plugin/)** - Cross-platform plugin management and execution
 - **[Extension Framework](extension/)** - Extension development and management
+- **[Alias System](alias/)** - Command alias management and execution
 
 ### Features
 
 - **[Hooks System](hooks/)** - Event-driven hooks and automation
 - **[Templates](templates/)** - Template system for resource generation
 - **[Progress Tracking](progress/)** - Progress indicators and status tracking
+- **[Alias Management](alias/)** - Command shortcuts and automation
 
 ### Guides and Examples
 
@@ -40,6 +42,8 @@ import (
     "context"
     "github.com/edsonmichaque/tykctl-go/config"
     "github.com/edsonmichaque/tykctl-go/plugin"
+    "github.com/edsonmichaque/tykctl-go/alias"
+    "github.com/spf13/cobra"
 )
 
 func main() {
@@ -52,21 +56,27 @@ func main() {
     }
     
     // Create plugin manager
-    manager := plugin.NewManager("my-extension", cfg)
+    pluginManager := plugin.NewManager("my-extension", cfg)
     
-    // Discover plugins
-    plugins, err := manager.DiscoverPlugins(ctx)
-    if err != nil {
-        panic(err)
-    }
+    // Create alias manager
+    aliasProvider := alias.NewExtensionConfigProvider(
+        setAliasFunc, getAliasFunc, deleteAliasFunc, listAliasesFunc,
+    )
+    aliasManager := alias.NewManager(aliasProvider, []string{"help", "version"})
     
-    // Execute plugin
-    if len(plugins) > 0 {
-        err = manager.Execute(ctx, plugins[0].Path, []string{"arg1", "arg2"})
-        if err != nil {
-            panic(err)
-        }
-    }
+    // Create root command
+    rootCmd := &cobra.Command{Use: "myapp"}
+    
+    // Add alias command
+    aliasBuilder := alias.NewCommandBuilder(aliasManager)
+    rootCmd.AddCommand(aliasBuilder.BuildAliasCommand())
+    
+    // Register aliases as subcommands
+    aliasRegistrar := alias.NewRegistrar(aliasManager)
+    aliasRegistrar.RegisterAliases(ctx, rootCmd)
+    
+    // Execute command
+    rootCmd.Execute()
 }
 ```
 
@@ -93,6 +103,18 @@ The plugin system provides:
 
 See [Plugin Documentation](plugin/README.md) for complete details.
 
+## 🔗 Alias System
+
+The alias system provides:
+
+- **Command Shortcuts** - Create shortcuts for commonly used commands
+- **Shell Integration** - Execute shell commands from aliases
+- **Parameter Expansion** - Support for `$1`, `$2`, `$*`, `$@` parameters
+- **Validation** - Comprehensive alias name and expansion validation
+- **Cobra Integration** - Seamless integration with Cobra commands
+
+See [Alias Documentation](alias/README.md) for complete details.
+
 ## 🏗️ Extension Development
 
 Create TykCtl extensions with:
@@ -100,6 +122,7 @@ Create TykCtl extensions with:
 - **Cobra Integration** - CLI command framework
 - **Configuration Management** - Built-in config system
 - **Plugin Support** - Plugin system integration
+- **Alias System** - Command alias management
 - **Hooks** - Event-driven automation
 - **Templates** - Resource generation
 
@@ -110,6 +133,7 @@ See [Extension Guide](extension/README.md) for development details.
 - **[API Client](api/README.md)** - HTTP client utilities
 - **[Configuration API](config/README.md)** - Configuration management
 - **[Plugin API](plugin/README.md)** - Plugin system API
+- **[Alias API](alias/README.md)** - Alias system API
 - **[Extension API](extension/README.md)** - Extension framework API
 
 ## 🤝 Contributing

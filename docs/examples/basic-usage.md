@@ -199,6 +199,159 @@ func main() {
 }
 ```
 
+## Alias Management
+
+### Creating and Managing Aliases
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    
+    "github.com/edsonmichaque/tykctl-go/alias"
+)
+
+func main() {
+    ctx := context.Background()
+    
+    // Create alias manager
+    provider := alias.NewInMemoryConfigProvider()
+    manager := alias.NewManager(provider, []string{"help", "version"})
+    
+    // Create simple aliases
+    err := manager.SetAlias(ctx, "co", "products checkout")
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    err = manager.SetAlias(ctx, "users", "users list")
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    // Create parameterized aliases
+    err = manager.SetAlias(ctx, "getuser", "users get $1")
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    err = manager.SetAlias(ctx, "deploy", "products deploy $1 --env $2")
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    // Create shell aliases
+    err = manager.SetAlias(ctx, "cleanup", "!rm -rf /tmp/tykctl-*")
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    err = manager.SetAlias(ctx, "logs", "!tail -f /var/log/tykctl.log")
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    // List all aliases
+    aliases := manager.ListAliases(ctx)
+    fmt.Printf("Created %d aliases:\n", len(aliases))
+    for name, expansion := range aliases {
+        aliasType := manager.GetAliasType(expansion)
+        fmt.Printf("- %s (%s): %s\n", name, aliasType, expansion)
+    }
+}
+```
+
+### Executing Aliases
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    
+    "github.com/edsonmichaque/tykctl-go/alias"
+)
+
+func main() {
+    ctx := context.Background()
+    
+    // Create alias manager
+    provider := alias.NewInMemoryConfigProvider()
+    manager := alias.NewManager(provider, []string{"help", "version"})
+    
+    // Set up aliases
+    manager.SetAlias(ctx, "deploy", "products deploy $1 --env $2")
+    manager.SetAlias(ctx, "getuser", "users get $1")
+    manager.SetAlias(ctx, "cleanup", "!rm -rf /tmp/tykctl-*")
+    
+    // Preview alias expansion
+    preview := manager.ExpandAliasPreview("deploy", []string{"my-api", "production"})
+    fmt.Printf("Deploy alias would execute: %s\n", preview)
+    
+    preview = manager.ExpandAliasPreview("getuser", []string{"john@example.com"})
+    fmt.Printf("Getuser alias would execute: %s\n", preview)
+    
+    // Execute aliases (in a real application, these would call the actual commands)
+    fmt.Println("Aliases are ready for execution!")
+}
+```
+
+### Cobra Integration with Aliases
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    
+    "github.com/spf13/cobra"
+    "github.com/edsonmichaque/tykctl-go/alias"
+)
+
+func main() {
+    ctx := context.Background()
+    
+    // Create root command
+    rootCmd := &cobra.Command{
+        Use:   "my-extension",
+        Short: "My TykCtl Extension with Aliases",
+        Long:  "A comprehensive extension with alias support",
+    }
+    
+    // Create alias manager
+    provider := alias.NewInMemoryConfigProvider()
+    manager := alias.NewManager(provider, []string{"help", "version", "my-extension"})
+    
+    // Add alias command
+    builder := alias.NewCommandBuilder(manager)
+    rootCmd.AddCommand(builder.BuildAliasCommand())
+    
+    // Register aliases as subcommands
+    registrar := alias.NewRegistrar(manager)
+    err := registrar.RegisterAliasesWithValidation(ctx, rootCmd, []string{"help", "version"})
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    // Set up some default aliases
+    manager.SetAlias(ctx, "co", "products checkout")
+    manager.SetAlias(ctx, "deploy", "products deploy $1 --env $2")
+    manager.SetAlias(ctx, "users", "users list")
+    
+    // Execute command
+    if err := rootCmd.Execute(); err != nil {
+        log.Fatal(err)
+    }
+}
+```
+
 ## Extension Development
 
 ### Basic Extension Structure
@@ -581,5 +734,6 @@ func main() {
 
 - [Getting Started Guide](../guides/getting-started.md)
 - [Plugin Development Guide](../guides/plugin-development.md)
+- [Alias System Documentation](../alias/README.md)
 - [Configuration Documentation](../config/README.md)
 - [Plugin System Documentation](../plugin/README.md)
