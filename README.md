@@ -1,6 +1,20 @@
-# Tykctl-Go
+# TykCtl-Go
 
 A comprehensive Go library for creating Tyk CLI extensions with best practices, templates, and utilities. This library provides a framework for building consistent, maintainable, and feature-rich CLI extensions for the Tyk ecosystem.
+
+## 📚 Documentation
+
+**👉 [View Complete Documentation](docs/README.md)**
+
+The documentation is organized in the `docs/` directory:
+
+- **[Getting Started](docs/guides/getting-started.md)** - Quick start guide
+- **[Plugin Development](docs/guides/plugin-development.md)** - Plugin development guide
+- **[API Reference](docs/api/)** - API documentation
+- **[Configuration](docs/config/)** - Configuration management
+- **[Plugin System](docs/plugin/)** - Cross-platform plugin system
+- **[Extension Framework](docs/extension/)** - Extension development
+- **[Development Guide](docs/development.md)** - Contributing guidelines
 
 ## Features
 
