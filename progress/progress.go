@@ -2,51 +2,45 @@ package progress
 
 import (
 	"context"
-	"fmt"
-	"os"
 	"sync"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
+	"github.com/briandowns/spinner"
+	"github.com/vbauerster/mpb/v8"
+	"github.com/vbauerster/mpb/v8/decor"
 )
 
 // Spinner represents a spinner
 type Spinner struct {
-	message string
-	frames  []string
-	index   int
-	done    bool
+	spinner *spinner.Spinner
 	mu      sync.Mutex
 }
 
 // Bar represents a progress bar
 type Bar struct {
-	message   string
-	total     int64
-	current   int64
-	width     int
-	done      bool
-	fillChar  string
-	emptyChar string
-	mu        sync.Mutex
+	bar     *mpb.Bar
+	message string
+	total   int64
+	current int64
+	mu      sync.Mutex
 }
 
 // New creates a new spinner
 func New() *Spinner {
+	// Custom spinner frames: ⠋⠙⠹⠸⠼
+	customFrames := []string{"⠋", "⠙", "⠹", "⠸", "⠼"}
+	s := spinner.New(customFrames, 100*time.Millisecond)
+	s.Suffix = " "
+	s.FinalMSG = "✓ Complete!\n"
 	return &Spinner{
-		message: "Loading...",
-		frames:  []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"},
+		spinner: s,
 	}
 }
 
 // NewBar creates a new progress bar
 func NewBar(total int64) *Bar {
 	return &Bar{
-		message:   "Progress",
-		total:     total,
-		width:     50,
-		fillChar:  "█",
-		emptyChar: "░",
+		total: total,
 	}
 }
 
@@ -54,22 +48,22 @@ func NewBar(total int64) *Bar {
 func (s *Spinner) WithMessage(message string) *Spinner {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.message = message
+	if s.spinner != nil {
+		s.spinner.Suffix = " " + message
+	}
 	return s
 }
 
 // WithContext runs a function with a spinner
 func (s *Spinner) WithContext(ctx context.Context, message string, fn func() error) error {
 	s.mu.Lock()
-	s.message = message
-	s.done = false
+	if s.spinner != nil {
+		s.spinner.Suffix = " " + message
+		s.spinner.Start()
+	}
 	s.mu.Unlock()
 
-	// Start spinner in background
-	stop := make(chan struct{})
-	go s.run(stop)
-
-	// Run the function
+	// Run the function in a goroutine
 	errChan := make(chan error, 1)
 	go func() {
 		errChan <- fn()
@@ -79,17 +73,17 @@ func (s *Spinner) WithContext(ctx context.Context, message string, fn func() err
 	select {
 	case err := <-errChan:
 		s.mu.Lock()
-		s.done = true
+		if s.spinner != nil {
+			s.spinner.Stop()
+		}
 		s.mu.Unlock()
-		close(stop)
-		s.clearLine()
 		return err
 	case <-ctx.Done():
 		s.mu.Lock()
-		s.done = true
+		if s.spinner != nil {
+			s.spinner.Stop()
+		}
 		s.mu.Unlock()
-		close(stop)
-		s.clearLine()
 		return ctx.Err()
 	}
 }
@@ -106,6 +100,9 @@ func (b *Bar) WithMessage(message string) *Bar {
 func (b *Bar) Add(inc int64) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	if b.bar != nil {
+		b.bar.IncrBy(int(inc))
+	}
 	b.current += inc
 	if b.current > b.total {
 		b.current = b.total
@@ -116,6 +113,9 @@ func (b *Bar) Add(inc int64) {
 func (b *Bar) SetCurrent(current int64) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	if b.bar != nil {
+		b.bar.SetCurrent(current)
+	}
 	b.current = current
 	if b.current > b.total {
 		b.current = b.total
@@ -128,14 +128,29 @@ func (b *Bar) WithContext(ctx context.Context, message string, total int64, fn f
 	b.message = message
 	b.total = total
 	b.current = 0
-	b.done = false
 	b.mu.Unlock()
 
-	// Start progress bar in background
-	stop := make(chan struct{})
-	go b.run(stop)
+	// Create progress container
+	p := mpb.New(mpb.WithWidth(64), mpb.WithRefreshRate(50*time.Millisecond))
 
-	// Run the function
+	// Create progress bar
+	bar := p.AddBar(total,
+		mpb.PrependDecorators(
+			decor.Name(message, decor.WC{W: len(message) + 1, C: decor.DindentRight}),
+		),
+		mpb.AppendDecorators(
+			decor.Percentage(decor.WC{W: 5}),
+			decor.OnComplete(
+				decor.EwmaETA(decor.ET_STYLE_GO, 60, decor.WC{W: 4}), "done",
+			),
+		),
+	)
+
+	b.mu.Lock()
+	b.bar = bar
+	b.mu.Unlock()
+
+	// Run the function in a goroutine
 	errChan := make(chan error, 1)
 	go func() {
 		errChan <- fn(func(inc int64) {
@@ -146,111 +161,10 @@ func (b *Bar) WithContext(ctx context.Context, message string, total int64, fn f
 	// Wait for completion or context cancellation
 	select {
 	case err := <-errChan:
-		b.mu.Lock()
-		b.done = true
-		b.mu.Unlock()
-		close(stop)
-		b.clearLine()
+		p.Wait()
 		return err
 	case <-ctx.Done():
-		b.mu.Lock()
-		b.done = true
-		b.mu.Unlock()
-		close(stop)
-		b.clearLine()
+		p.Wait()
 		return ctx.Err()
 	}
-}
-
-// run runs the spinner animation
-func (s *Spinner) run(stop <-chan struct{}) {
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-stop:
-			return
-		case <-ticker.C:
-			s.mu.Lock()
-			if s.done {
-				s.mu.Unlock()
-				return
-			}
-			s.index = (s.index + 1) % len(s.frames)
-			s.mu.Unlock()
-			s.render()
-		}
-	}
-}
-
-// run runs the progress bar animation
-func (b *Bar) run(stop <-chan struct{}) {
-	ticker := time.NewTicker(50 * time.Millisecond)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-stop:
-			return
-		case <-ticker.C:
-			b.mu.Lock()
-			if b.done {
-				b.mu.Unlock()
-				return
-			}
-			b.mu.Unlock()
-			b.render()
-		}
-	}
-}
-
-// render renders the spinner
-func (s *Spinner) render() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	
-	// Clear the line and print spinner
-	fmt.Fprintf(os.Stderr, "\r%s %s", s.frames[s.index], s.message)
-}
-
-// render renders the progress bar
-func (b *Bar) render() {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	if b.total <= 0 {
-		fmt.Fprintf(os.Stderr, "\r%s: %d", b.message, b.current)
-		return
-	}
-
-	percent := float64(b.current) / float64(b.total)
-	filled := int(float64(b.width) * percent)
-	empty := b.width - filled
-
-	bar := ""
-	for i := 0; i < filled; i++ {
-		bar += b.fillChar
-	}
-	for i := 0; i < empty; i++ {
-		bar += b.emptyChar
-	}
-
-	style := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-	fmt.Fprintf(os.Stderr, "\r%s: %s %d/%d (%.1f%%)",
-		b.message,
-		style.Render(bar),
-		b.current,
-		b.total,
-		percent*100)
-}
-
-// clearLine clears the current line
-func (s *Spinner) clearLine() {
-	fmt.Fprintf(os.Stderr, "\r%s", "\033[2K")
-}
-
-// clearLine clears the current line
-func (b *Bar) clearLine() {
-	fmt.Fprintf(os.Stderr, "\r%s", "\033[2K")
 }

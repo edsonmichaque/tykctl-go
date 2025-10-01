@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"os"
@@ -262,12 +263,43 @@ func extractCacheTypeFromName(name string) string {
 }
 
 func getHookSearchPaths(extension string, contextPaths []string) []string {
-	paths := []string{
-		filepath.Join("/etc/tykctl", extension, "hooks"),
-		filepath.Join(xdg.DataHome, "tykctl", extension, "hooks"),
-		filepath.Join(os.Getenv("HOME"), ".tykctl", extension, "hooks"),
-		filepath.Join(".tykctl", extension, "hooks"),
+	var paths []string
+	
+	// Extension-specific directory environment variables (highest priority)
+	extensionUpper := strings.ToUpper(extension)
+	
+	// TYKCTL_<EXTENSION>_HOME
+	if home := os.Getenv(fmt.Sprintf("TYKCTL_%s_HOME", extensionUpper)); home != "" {
+		paths = append(paths, filepath.Join(home, "hooks"))
 	}
+	
+	// TYKCTL_<EXTENSION>_DIR
+	if dir := os.Getenv(fmt.Sprintf("TYKCTL_%s_DIR", extensionUpper)); dir != "" {
+		paths = append(paths, filepath.Join(dir, "hooks"))
+	}
+	
+	// TYKCTL_<EXTENSION>_ROOT
+	if root := os.Getenv(fmt.Sprintf("TYKCTL_%s_ROOT", extensionUpper)); root != "" {
+		paths = append(paths, filepath.Join(root, extension, "hooks"))
+	}
+	
+	// Global TYKCTL_HOME
+	if home := os.Getenv("TYKCTL_HOME"); home != "" {
+		paths = append(paths, filepath.Join(home, extension, "hooks"))
+	}
+	
+	// Standard system paths (FHS compliant)
+	paths = append(paths, filepath.Join("/etc/tykctl", extension, "hooks"))
+	
+	// Standard user paths (XDG compliant)
+	paths = append(paths, filepath.Join(xdg.DataHome, "tykctl", extension, "hooks"))
+	paths = append(paths, filepath.Join(os.Getenv("HOME"), ".tykctl", extension, "hooks"))
+	
+	// Development paths
+	paths = append(paths, filepath.Join(".tykctl", extension, "hooks"))
+	paths = append(paths, "./hooks")
+	paths = append(paths, "../hooks")
+	paths = append(paths, "./examples/hooks")
 	
 	// Add context-specific paths
 	for _, contextPath := range contextPaths {
@@ -278,29 +310,112 @@ func getHookSearchPaths(extension string, contextPaths []string) []string {
 }
 
 func getPluginSearchPaths(extension string, contextPaths []string) []string {
-	paths := []string{
-		"/usr/local/bin",
-		"/usr/bin",
-		filepath.Join(xdg.DataHome, "tykctl", extension, "bin"),
-		filepath.Join(os.Getenv("HOME"), ".tykctl", extension, "bin"),
-		filepath.Join(".tykctl", extension, "bin"),
+	var paths []string
+	
+	// Extension-specific plugin environment variables (highest priority)
+	extensionUpper := strings.ToUpper(extension)
+	
+	// TYKCTL_<EXTENSION>_PLUGIN_DIR
+	if pluginDir := os.Getenv(fmt.Sprintf("TYKCTL_%s_PLUGIN_DIR", extensionUpper)); pluginDir != "" {
+		paths = append(paths, pluginDir)
 	}
+	
+	// TYKCTL_<EXTENSION>_PLUGIN_DATA_DIR
+	if pluginDataDir := os.Getenv(fmt.Sprintf("TYKCTL_%s_PLUGIN_DATA_DIR", extensionUpper)); pluginDataDir != "" {
+		paths = append(paths, pluginDataDir)
+	}
+	
+	// Extension-specific directory environment variables
+	// TYKCTL_<EXTENSION>_HOME
+	if home := os.Getenv(fmt.Sprintf("TYKCTL_%s_HOME", extensionUpper)); home != "" {
+		paths = append(paths, filepath.Join(home, "plugins", "bin"))
+		paths = append(paths, filepath.Join(home, "plugins", "lib"))
+	}
+	
+	// TYKCTL_<EXTENSION>_DIR
+	if dir := os.Getenv(fmt.Sprintf("TYKCTL_%s_DIR", extensionUpper)); dir != "" {
+		paths = append(paths, filepath.Join(dir, "plugins", "bin"))
+		paths = append(paths, filepath.Join(dir, "plugins", "lib"))
+	}
+	
+	// TYKCTL_<EXTENSION>_ROOT
+	if root := os.Getenv(fmt.Sprintf("TYKCTL_%s_ROOT", extensionUpper)); root != "" {
+		paths = append(paths, filepath.Join(root, extension, "plugins", "bin"))
+		paths = append(paths, filepath.Join(root, extension, "plugins", "lib"))
+	}
+	
+	// Global TYKCTL_HOME
+	if home := os.Getenv("TYKCTL_HOME"); home != "" {
+		paths = append(paths, filepath.Join(home, extension, "plugins", "bin"))
+		paths = append(paths, filepath.Join(home, extension, "plugins", "lib"))
+	}
+	
+	// Standard system paths (FHS compliant)
+	paths = append(paths, "/usr/local/lib/tykctl/"+extension+"/plugins")
+	paths = append(paths, "/usr/lib/tykctl/"+extension+"/plugins")
+	paths = append(paths, "/opt/tykctl/"+extension+"/plugins")
+	
+	// Standard user paths (XDG compliant)
+	paths = append(paths, filepath.Join(xdg.DataHome, "tykctl", extension, "plugins"))
+	paths = append(paths, filepath.Join(os.Getenv("HOME"), ".tykctl", extension, "plugins"))
+	
+	// Development paths
+	paths = append(paths, "./plugins")
+	paths = append(paths, "../plugins")
+	paths = append(paths, "./examples/plugins/bin")
+	paths = append(paths, "./examples/plugins/lib")
+	
+	// Current working directory paths
+	paths = append(paths, "./plugins/bin")
+	paths = append(paths, "./plugins/lib")
 	
 	// Add context-specific paths
 	for _, contextPath := range contextPaths {
-		paths = append(paths, filepath.Join(contextPath, extension, "bin"))
+		paths = append(paths, filepath.Join(contextPath, extension, "plugins", "bin"))
+		paths = append(paths, filepath.Join(contextPath, extension, "plugins", "lib"))
 	}
 	
 	return paths
 }
 
 func getTemplateSearchPaths(extension string, contextPaths []string) []string {
-	paths := []string{
-		filepath.Join("/etc/tykctl", extension, "templates"),
-		filepath.Join(xdg.DataHome, "tykctl", extension, "templates"),
-		filepath.Join(os.Getenv("HOME"), ".tykctl", extension, "templates"),
-		filepath.Join(".tykctl", extension, "templates"),
+	var paths []string
+	
+	// Extension-specific directory environment variables (highest priority)
+	extensionUpper := strings.ToUpper(extension)
+	
+	// TYKCTL_<EXTENSION>_HOME
+	if home := os.Getenv(fmt.Sprintf("TYKCTL_%s_HOME", extensionUpper)); home != "" {
+		paths = append(paths, filepath.Join(home, "templates"))
 	}
+	
+	// TYKCTL_<EXTENSION>_DIR
+	if dir := os.Getenv(fmt.Sprintf("TYKCTL_%s_DIR", extensionUpper)); dir != "" {
+		paths = append(paths, filepath.Join(dir, "templates"))
+	}
+	
+	// TYKCTL_<EXTENSION>_ROOT
+	if root := os.Getenv(fmt.Sprintf("TYKCTL_%s_ROOT", extensionUpper)); root != "" {
+		paths = append(paths, filepath.Join(root, extension, "templates"))
+	}
+	
+	// Global TYKCTL_HOME
+	if home := os.Getenv("TYKCTL_HOME"); home != "" {
+		paths = append(paths, filepath.Join(home, extension, "templates"))
+	}
+	
+	// Standard system paths (FHS compliant)
+	paths = append(paths, filepath.Join("/etc/tykctl", extension, "templates"))
+	
+	// Standard user paths (XDG compliant)
+	paths = append(paths, filepath.Join(xdg.DataHome, "tykctl", extension, "templates"))
+	paths = append(paths, filepath.Join(os.Getenv("HOME"), ".tykctl", extension, "templates"))
+	
+	// Development paths
+	paths = append(paths, filepath.Join(".tykctl", extension, "templates"))
+	paths = append(paths, "./templates")
+	paths = append(paths, "../templates")
+	paths = append(paths, "./examples/templates")
 	
 	// Add context-specific paths
 	for _, contextPath := range contextPaths {
@@ -311,12 +426,43 @@ func getTemplateSearchPaths(extension string, contextPaths []string) []string {
 }
 
 func getCacheSearchPaths(extension string, contextPaths []string) []string {
-	paths := []string{
-		filepath.Join("/etc/tykctl", extension, "cache"),
-		filepath.Join(xdg.DataHome, "tykctl", extension, "cache"),
-		filepath.Join(os.Getenv("HOME"), ".tykctl", extension, "cache"),
-		filepath.Join(".tykctl", extension, "cache"),
+	var paths []string
+	
+	// Extension-specific directory environment variables (highest priority)
+	extensionUpper := strings.ToUpper(extension)
+	
+	// TYKCTL_<EXTENSION>_HOME
+	if home := os.Getenv(fmt.Sprintf("TYKCTL_%s_HOME", extensionUpper)); home != "" {
+		paths = append(paths, filepath.Join(home, "cache"))
 	}
+	
+	// TYKCTL_<EXTENSION>_DIR
+	if dir := os.Getenv(fmt.Sprintf("TYKCTL_%s_DIR", extensionUpper)); dir != "" {
+		paths = append(paths, filepath.Join(dir, "cache"))
+	}
+	
+	// TYKCTL_<EXTENSION>_ROOT
+	if root := os.Getenv(fmt.Sprintf("TYKCTL_%s_ROOT", extensionUpper)); root != "" {
+		paths = append(paths, filepath.Join(root, extension, "cache"))
+	}
+	
+	// Global TYKCTL_HOME
+	if home := os.Getenv("TYKCTL_HOME"); home != "" {
+		paths = append(paths, filepath.Join(home, extension, "cache"))
+	}
+	
+	// Standard system paths (FHS compliant)
+	paths = append(paths, filepath.Join("/etc/tykctl", extension, "cache"))
+	
+	// Standard user paths (XDG compliant)
+	paths = append(paths, filepath.Join(xdg.DataHome, "tykctl", extension, "cache"))
+	paths = append(paths, filepath.Join(os.Getenv("HOME"), ".tykctl", extension, "cache"))
+	
+	// Development paths
+	paths = append(paths, filepath.Join(".tykctl", extension, "cache"))
+	paths = append(paths, "./cache")
+	paths = append(paths, "../cache")
+	paths = append(paths, "./examples/cache")
 	
 	// Add context-specific paths
 	for _, contextPath := range contextPaths {
@@ -324,6 +470,30 @@ func getCacheSearchPaths(extension string, contextPaths []string) []string {
 	}
 	
 	return paths
+}
+
+// GetPluginDiscoveryPaths returns all plugin discovery paths for the given extension
+// This is a public wrapper around getPluginSearchPaths for use by extensions
+func GetPluginDiscoveryPaths(ctx context.Context, extension string) []string {
+	return getPluginSearchPaths(extension, []string{})
+}
+
+// GetHookDiscoveryPaths returns all hook discovery paths for the given extension
+// This is a public wrapper around getHookSearchPaths for use by extensions
+func GetHookDiscoveryPaths(ctx context.Context, extension string) []string {
+	return getHookSearchPaths(extension, []string{})
+}
+
+// GetTemplateDiscoveryPaths returns all template discovery paths for the given extension
+// This is a public wrapper around getTemplateSearchPaths for use by extensions
+func GetTemplateDiscoveryPaths(ctx context.Context, extension string) []string {
+	return getTemplateSearchPaths(extension, []string{})
+}
+
+// GetCacheDiscoveryPaths returns all cache discovery paths for the given extension
+// This is a public wrapper around getCacheSearchPaths for use by extensions
+func GetCacheDiscoveryPaths(ctx context.Context, extension string) []string {
+	return getCacheSearchPaths(extension, []string{})
 }
 
 func matchesHookFilter(hook Hook, filter HookFilter) bool {

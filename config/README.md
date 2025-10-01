@@ -240,6 +240,33 @@ export TYKCTL_MY_APP_MAX_TOKENS="1024"
 export TYKCTL_MY_APP_TEMPERATURE="0.5"
 export TYKCTL_MY_APP_CACHE_ENABLED="true"
 export TYKCTL_MY_APP_CACHE_TTL="2h"
+
+# Extension-specific resource discovery paths
+export TYKCTL_MY_APP_HOME="/opt/my-app"
+export TYKCTL_MY_APP_DIR="/usr/local/my-app"
+export TYKCTL_MY_APP_ROOT="/var/lib/my-app"
+export TYKCTL_MY_APP_PLUGIN_DIR="/custom/plugins"
+export TYKCTL_MY_APP_PLUGIN_DATA_DIR="/custom/plugin-data"
+```
+
+### Extension-Specific Environment Variables Usage
+
+```bash
+# Development environment setup
+export TYKCTL_PORTAL_HOME="$HOME/dev/tykctl-portal"
+export TYKCTL_PORTAL_PLUGIN_DIR="$HOME/dev/tykctl-portal/plugins"
+export TYKCTL_DASHBOARD_HOME="$HOME/dev/tykctl-dashboard"
+export TYKCTL_DASHBOARD_PLUGIN_DIR="$HOME/dev/tykctl-dashboard/plugins"
+
+# Production environment setup
+export TYKCTL_PORTAL_DIR="/opt/tykctl/portal"
+export TYKCTL_PORTAL_PLUGIN_DIR="/opt/tykctl/portal/plugins"
+export TYKCTL_DASHBOARD_DIR="/opt/tykctl/dashboard"
+export TYKCTL_DASHBOARD_PLUGIN_DIR="/opt/tykctl/dashboard/plugins"
+
+# Custom plugin data directory
+export TYKCTL_PORTAL_PLUGIN_DATA_DIR="/custom/path/to/portal/plugin/data"
+export TYKCTL_DASHBOARD_PLUGIN_DATA_DIR="/custom/path/to/dashboard/plugin/data"
 ```
 
 ### Context Configuration
@@ -281,30 +308,94 @@ resources:
 
 ## Resource Discovery Paths
 
+The package supports extension-specific environment variables for fine-grained control over resource discovery paths. These variables take precedence over standard paths.
+
+### Extension-Specific Environment Variables
+
+**Pattern:** `TYKCTL_<EXTENSION>_{HOME,DIR,ROOT,PLUGIN_DIR,PLUGIN_DATA_DIR}`
+
+**Examples:**
+- `TYKCTL_PORTAL_HOME` → `$TYKCTL_PORTAL_HOME/hooks`, `$TYKCTL_PORTAL_HOME/plugins/bin`, etc.
+- `TYKCTL_PORTAL_DIR` → `$TYKCTL_PORTAL_DIR/hooks`, `$TYKCTL_PORTAL_DIR/plugins/bin`, etc.
+- `TYKCTL_PORTAL_ROOT` → `$TYKCTL_PORTAL_ROOT/portal/hooks`, `$TYKCTL_PORTAL_ROOT/portal/plugins/bin`, etc.
+- `TYKCTL_PORTAL_PLUGIN_DIR` → `$TYKCTL_PORTAL_PLUGIN_DIR`
+- `TYKCTL_PORTAL_PLUGIN_DATA_DIR` → `$TYKCTL_PORTAL_PLUGIN_DATA_DIR`
+
+**Global Variables:**
+- `TYKCTL_HOME` → `$TYKCTL_HOME/<extension>/hooks`, `$TYKCTL_HOME/<extension>/plugins/bin`, etc.
+
+### Discovery Priority Order
+
+1. **Extension-specific plugin variables** (highest priority)
+   - `TYKCTL_<EXTENSION>_PLUGIN_DIR`
+   - `TYKCTL_<EXTENSION>_PLUGIN_DATA_DIR`
+
+2. **Extension-specific directory variables**
+   - `TYKCTL_<EXTENSION>_HOME/hooks`, `TYKCTL_<EXTENSION>_HOME/plugins/bin`, etc.
+   - `TYKCTL_<EXTENSION>_DIR/hooks`, `TYKCTL_<EXTENSION>_DIR/plugins/bin`, etc.
+   - `TYKCTL_<EXTENSION>_ROOT/<extension>/hooks`, `TYKCTL_<EXTENSION>_ROOT/<extension>/plugins/bin`, etc.
+
+3. **Global TYKCTL_HOME**
+   - `TYKCTL_HOME/<extension>/hooks`, `TYKCTL_HOME/<extension>/plugins/bin`, etc.
+
+4. **Standard system paths** (FHS compliant)
+   - `/usr/local/lib/tykctl/<extension>/plugins`
+   - `/usr/lib/tykctl/<extension>/plugins`
+   - `/opt/tykctl/<extension>/plugins`
+   - `/etc/tykctl/<extension>/hooks`
+
+5. **Standard user paths** (XDG compliant)
+   - `~/.local/share/tykctl/<extension>/plugins`
+   - `~/.local/share/tykctl/<extension>/hooks`
+   - `~/.tykctl/<extension>/plugins`
+   - `~/.tykctl/<extension>/hooks`
+
+6. **Development paths**
+   - `./plugins`, `../plugins`
+   - `./hooks`, `../hooks`
+   - `./examples/plugins/bin`
+   - `./examples/hooks`
+
+7. **Current working directory paths**
+   - `./plugins/bin`, `./plugins/lib`
+   - `./hooks`
+
 ### Hooks
+- Extension-specific environment variables (see above)
 - `/etc/tykctl/<extension>/hooks`
 - `~/.local/share/tykctl/<extension>/hooks`
 - `~/.tykctl/<extension>/hooks`
 - `./.tykctl/<extension>/hooks`
+- `./hooks`, `../hooks`, `./examples/hooks`
 
 ### Plugins
-- `/usr/local/bin`
-- `/usr/bin`
-- `~/.local/share/tykctl/<extension>/bin`
-- `~/.tykctl/<extension>/bin`
-- `./.tykctl/<extension>/bin`
+- Extension-specific plugin environment variables (see above)
+- `/usr/local/lib/tykctl/<extension>/plugins`
+- `/usr/lib/tykctl/<extension>/plugins`
+- `/opt/tykctl/<extension>/plugins`
+- `~/.local/share/tykctl/<extension>/plugins`
+- `~/.tykctl/<extension>/plugins`
+- `./plugins`, `../plugins`
+- `./examples/plugins/bin`
+- `./plugins/bin`, `./plugins/lib`
 
 ### Templates
+- Extension-specific environment variables (see above)
 - `/etc/tykctl/<extension>/templates`
 - `~/.local/share/tykctl/<extension>/templates`
 - `~/.tykctl/<extension>/templates`
 - `./.tykctl/<extension>/templates`
+- `./templates`, `../templates`
+- `./examples/templates`
 
 ### Cache Configurations
+- Extension-specific environment variables (see above)
 - `/etc/tykctl/<extension>/cache`
 - `~/.local/share/tykctl/<extension>/cache`
 - `~/.tykctl/<extension>/cache`
 - `./.tykctl/<extension>/cache`
+- `./cache`, `../cache`
+- `./examples/cache`
 
 ## Validation
 
