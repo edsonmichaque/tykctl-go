@@ -113,8 +113,9 @@ func (m *MetricsMiddleware) Process(ctx context.Context, event *Event, next func
 	// Update duration metrics
 	durationKey := fmt.Sprintf("events.%s.duration", event.Type)
 	if durations, exists := m.metrics[durationKey]; exists {
-		durations.([]time.Duration) = append(durations.([]time.Duration), duration)
-		m.metrics[durationKey] = durations
+		if durSlice, ok := durations.([]time.Duration); ok {
+			m.metrics[durationKey] = append(durSlice, duration)
+		}
 	} else {
 		m.metrics[durationKey] = []time.Duration{duration}
 	}

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 // Config contains configuration for the event bus.
@@ -82,7 +83,7 @@ type LoggingConfig struct {
 	Enabled bool
 
 	// Level is the log level for events.
-	Level zap.Level
+	Level zapcore.Level
 
 	// IncludeData includes event data in logs.
 	IncludeData bool
