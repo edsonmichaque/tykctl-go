@@ -1,0 +1,254 @@
+// Package eventbus provides usage examples for the generic event bus.
+package eventbus
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"time"
+
+	"github.com/edsonmichaque/tykctl-go/eventbus"
+	"go.uber.org/zap"
+)
+
+// Define your event types
+const (
+	// API Events
+	EventTypeAPICreate      eventbus.EventType = "api.create"
+	EventTypeAPIUpdate      eventbus.EventType = "api.update"
+	EventTypeAPIDelete      eventbus.EventType = "api.delete"
+	EventTypeAPIGet         eventbus.EventType = "api.get"
+	EventTypeAPIList        eventbus.EventType = "api.list"
+
+	// Command Events
+	EventTypeCommandStart    eventbus.EventType = "command.start"
+	EventTypeCommandComplete eventbus.EventType = "command.complete"
+	EventTypeCommandError    eventbus.EventType = "command.error"
+
+	// Session Events
+	EventTypeSessionStart eventbus.EventType = "session.start"
+	EventTypeSessionEnd   eventbus.EventType = "session.end"
+
+	// Configuration Events
+	EventTypeConfigLoad eventbus.EventType = "config.load"
+	EventTypeConfigSave eventbus.EventType = "config.save"
+
+	// Authentication Events
+	EventTypeAuthLogin  eventbus.EventType = "auth.login"
+	EventTypeAuthLogout eventbus.EventType = "auth.logout"
+)
+
+func main() {
+	// Create logger
+	logger, _ := zap.NewDevelopment()
+
+	// Create event bus
+	bus := eventbus.New(
+		eventbus.WithLogger(logger),
+		eventbus.WithAsyncWorkers(3),
+		eventbus.WithAsyncQueueSize(100),
+	)
+	defer bus.Close()
+
+	// Example 1: Basic event handling
+	fmt.Println("=== Example 1: Basic Event Handling ===")
+	
+	// Subscribe to API create events
+	subscription1, err := bus.Subscribe(EventTypeAPICreate, eventbus.HandlerFunc(
+		func(ctx context.Context, event *eventbus.Event) error {
+			fmt.Printf("API created: %+v\n", event.Data)
+			return nil
+		},
+	))
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer subscription1.Unsubscribe()
+
+	// Publish API create event
+	event := eventbus.NewEvent(EventTypeAPICreate, map[string]interface{}{
+		"api_id": "api-123",
+		"name":   "My API",
+		"version": "1.0",
+	}).WithSource("tykctl-gateway")
+
+	err = bus.Publish(event)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Example 2: Async event handling
+	fmt.Println("\n=== Example 2: Async Event Handling ===")
+	
+	// Subscribe to command events
+	subscription2, err := bus.Subscribe(EventTypeCommandStart, eventbus.HandlerFunc(
+		func(ctx context.Context, event *eventbus.Event) error {
+			fmt.Printf("Command started: %s\n", event.Data.(map[string]interface{})["command"])
+			return nil
+		},
+	))
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer subscription2.Unsubscribe()
+
+	// Publish async command event
+	commandEvent := eventbus.NewEvent(EventTypeCommandStart, map[string]interface{}{
+		"command": "apis create",
+		"args":    []string{"--name", "test-api"},
+	}).WithSource("tykctl-gateway")
+
+	err = bus.PublishAsync(commandEvent)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Example 3: Custom handler with priority
+	fmt.Println("\n=== Example 3: Custom Handler with Priority ===")
+	
+	// Create custom handler
+	highPriorityHandler := &eventbus.BaseHandler{
+		name:     "high-priority-handler",
+		priority: 100,
+		timeout:  5 * time.Second,
+		canHandle: func(eventType eventbus.EventType) bool {
+			return eventType == EventTypeAPICreate
+		},
+		handle: func(ctx context.Context, event *eventbus.Event) error {
+			fmt.Printf("High priority handler processing: %s\n", event.Type)
+			return nil
+		},
+	}
+
+	lowPriorityHandler := &eventbus.BaseHandler{
+		name:     "low-priority-handler",
+		priority: 50,
+		timeout:  5 * time.Second,
+		canHandle: func(eventType eventbus.EventType) bool {
+			return eventType == EventTypeAPICreate
+		},
+		handle: func(ctx context.Context, event *eventbus.Event) error {
+			fmt.Printf("Low priority handler processing: %s\n", event.Type)
+			return nil
+		},
+	}
+
+	// Subscribe handlers
+	subscription3, _ := bus.Subscribe(EventTypeAPICreate, highPriorityHandler)
+	defer subscription3.Unsubscribe()
+
+	subscription4, _ := bus.Subscribe(EventTypeAPICreate, lowPriorityHandler)
+	defer subscription4.Unsubscribe()
+
+	// Publish event (high priority handler should execute first)
+	priorityEvent := eventbus.NewEvent(EventTypeAPICreate, map[string]interface{}{
+		"api_id": "priority-api",
+	})
+	bus.Publish(priorityEvent)
+
+	// Example 4: Middleware usage
+	fmt.Println("\n=== Example 4: Middleware Usage ===")
+	
+	// Set up middleware
+	loggingMiddleware := eventbus.NewLoggingMiddleware(logger)
+	metricsMiddleware := eventbus.NewMetricsMiddleware()
+	validationMiddleware := eventbus.NewValidationMiddleware()
+
+	// Add validation for API events
+	validationMiddleware.AddValidator(EventTypeAPICreate, func(event *eventbus.Event) error {
+		if event.Data == nil {
+			return fmt.Errorf("event data is required")
+		}
+		return nil
+	})
+
+	bus.SetMiddleware(loggingMiddleware, metricsMiddleware, validationMiddleware)
+
+	// Subscribe to validated events
+	subscription5, _ := bus.Subscribe(EventTypeAPICreate, eventbus.HandlerFunc(
+		func(ctx context.Context, event *eventbus.Event) error {
+			fmt.Printf("Validated API event: %+v\n", event.Data)
+			return nil
+		},
+	))
+	defer subscription5.Unsubscribe()
+
+	// Publish valid event
+	validEvent := eventbus.NewEvent(EventTypeAPICreate, map[string]interface{}{
+		"api_id": "valid-api",
+		"name":   "Valid API",
+	})
+	bus.Publish(validEvent)
+
+	// Example 5: Event filtering
+	fmt.Println("\n=== Example 5: Event Filtering ===")
+	
+	// Create filtered handler
+	filteredHandler := eventbus.HandlerFunc(func(ctx context.Context, event *eventbus.Event) error {
+		fmt.Printf("Filtered event from %s: %s\n", event.Source, event.Type)
+		return nil
+	})
+
+	filter := eventbus.EventFilter{
+		Sources: []string{"tykctl-gateway"},
+		Types:   []eventbus.EventType{EventTypeAPICreate},
+	}
+
+	filteredHandlerWrapper := eventbus.NewFilteredHandler(filteredHandler, filter)
+
+	subscription6, _ := bus.Subscribe(EventTypeAPICreate, filteredHandlerWrapper)
+	defer subscription6.Unsubscribe()
+
+	// Publish events from different sources
+	gatewayEvent := eventbus.NewEvent(EventTypeAPICreate, map[string]interface{}{"api_id": "gateway-api"})
+	gatewayEvent.WithSource("tykctl-gateway")
+
+	portalEvent := eventbus.NewEvent(EventTypeAPICreate, map[string]interface{}{"api_id": "portal-api"})
+	portalEvent.WithSource("tykctl-portal")
+
+	bus.Publish(gatewayEvent) // Will be processed
+	bus.Publish(portalEvent)  // Will be filtered out
+
+	// Example 6: Error handling and retry
+	fmt.Println("\n=== Example 6: Error Handling and Retry ===")
+	
+	// Create handler that fails initially
+	attemptCount := 0
+	failingHandler := eventbus.HandlerFunc(func(ctx context.Context, event *eventbus.Event) error {
+		attemptCount++
+		fmt.Printf("Attempt %d for event %s\n", attemptCount, event.Type)
+		
+		if attemptCount < 3 {
+			return fmt.Errorf("simulated failure")
+		}
+		
+		fmt.Printf("Successfully processed event %s\n", event.Type)
+		return nil
+	})
+
+	// Wrap with retry middleware
+	retryHandler := eventbus.NewRetryHandler(failingHandler, 3, 100*time.Millisecond)
+
+	subscription7, _ := bus.Subscribe(EventTypeCommandComplete, retryHandler)
+	defer subscription7.Unsubscribe()
+
+	// Publish event
+	retryEvent := eventbus.NewEvent(EventTypeCommandComplete, map[string]interface{}{
+		"command": "test-command",
+		"success": true,
+	})
+	bus.Publish(retryEvent)
+
+	// Wait for all async processing
+	time.Sleep(500 * time.Millisecond)
+
+	// Example 7: Statistics
+	fmt.Println("\n=== Example 7: Statistics ===")
+	stats := bus.GetStats()
+	fmt.Printf("Events published: %d\n", stats.EventsPublished)
+	fmt.Printf("Events processed: %d\n", stats.EventsProcessed)
+	fmt.Printf("Events failed: %d\n", stats.EventsFailed)
+	fmt.Printf("Active subscriptions: %d\n", stats.ActiveSubscriptions)
+
+	fmt.Println("\n=== All Examples Complete ===")
+}
