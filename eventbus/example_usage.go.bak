@@ -1,5 +1,5 @@
-// Package eventbus provides usage examples for the generic event bus.
-package eventbus
+// Package main provides usage examples for the generic event bus.
+package main
 
 import (
 	"context"
