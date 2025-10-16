@@ -1,6 +1,6 @@
 module github.com/edsonmichaque/tykctl-go
 
-go 1.21
+go 1.25
 
 require (
 	github.com/adrg/xdg v0.5.3
