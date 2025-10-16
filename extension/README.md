@@ -58,9 +58,8 @@ func main() {
     
     ctx := context.Background()
     
-    // Install with specific version
-    err := installer.InstallExtensionWithVersion(ctx, "owner", "repo", "v1.2.3")
-    if err != nil {
+    // Install extension with the configured options
+    if err := installer.InstallExtension(ctx, "owner", "repo"); err != nil {
         log.Fatal(err)
     }
 }
@@ -120,29 +119,26 @@ func runExtension() error {
 
 ```go
 import (
+    "context"
+    "fmt"
+
     "github.com/edsonmichaque/tykctl-go/extension"
     "github.com/edsonmichaque/tykctl-go/hook"
+    "go.uber.org/zap"
 )
 
-func installWithHooks() error {
-    // Create hook manager
-    hookManager := hook.New(
-        hook.WithExternalHookDir("/tmp/tykctl-hooks"),
-        hook.WithLogger(logger),
-    )
-    
-    // Register hooks
+func installWithHooks(logger *zap.Logger) error {
     ctx := context.Background()
-    hookManager.RegisterBuiltin(ctx, extension.HookTypeBeforeInstall, func(ctx context.Context, data interface{}) error {
-        hookData := data.(*hook.HookData)
-        fmt.Printf("About to install: %s\n", hookData.ExtensionName)
+    hooks := hook.NewBuiltinProcessor(logger)
+    
+    hooks.Register(extension.HookTypeBeforeInstall, func(ctx context.Context, data *hook.Data) error {
+        fmt.Printf("About to install: %s\n", data.ExtensionName)
         return nil
     })
     
-    // Create installer with hooks
     installer := extension.NewInstaller(
         "/tmp/tykctl-config",
-        extension.WithHooks(hookManager),
+        extension.WithHooks(hooks),
     )
     
     // Install extension (hooks will be executed)
@@ -169,16 +165,17 @@ func manageExtensions() error {
             ext.Name, ext.Version, ext.Repository)
     }
     
-    // Check if extension is installed
-    if installer.IsExtensionInstalled(ctx, "my-extension") {
-        fmt.Println("Extension is installed")
-        
-        // Uninstall extension
-        err = installer.UninstallExtension(ctx, "my-extension")
-        if err != nil {
-            return err
+    // Remove an extension if it is present
+    for _, ext := range installed {
+        if ext.Name == "my-extension" {
+            fmt.Println("Extension is installed")
+            
+            if err := installer.RemoveExtension(ctx, ext.Name); err != nil {
+                return err
+            }
+            fmt.Println("Extension removed")
+            break
         }
-        fmt.Println("Extension uninstalled")
     }
     
     return nil
@@ -194,19 +191,15 @@ func installWithCustomConfig() error {
         "/custom/config/dir",
         extension.WithGitHubToken(os.Getenv("GITHUB_TOKEN")),
         extension.WithLogger(customLogger),
-        extension.WithTimeout(5*time.Minute),
     )
     
     ctx := context.Background()
     
-    // Install with custom options
-    err := installer.InstallExtensionWithOptions(ctx, "owner", "repo", &extension.InstallOptions{
-        Version: "v1.0.0",
-        Force:   true,
-        Update:  false,
-    })
+    if err := installer.InstallExtension(ctx, "owner", "repo"); err != nil {
+        return err
+    }
     
-    return err
+    return nil
 }
 ```
 
@@ -218,43 +211,35 @@ The extension package defines several hook types for lifecycle management:
 
 ```go
 const (
-    HookTypeBeforeInstall   hook.HookType = "extension-before-install"
-    HookTypeAfterInstall    hook.HookType = "extension-after-install"
-    HookTypeBeforeUninstall hook.HookType = "extension-before-uninstall"
-    HookTypeAfterUninstall  hook.HookType = "extension-after-uninstall"
-    HookTypeBeforeRun       hook.HookType = "extension-before-run"
+    HookTypeBeforeInstall   hook.Type = "extension-before-install"
+    HookTypeAfterInstall    hook.Type = "extension-after-install"
+    HookTypeBeforeUninstall hook.Type = "extension-before-uninstall"
+    HookTypeAfterUninstall  hook.Type = "extension-after-uninstall"
+    HookTypeBeforeRun       hook.Type = "extension-before-run"
 )
 ```
 
 ### Hook Integration
 
 ```go
-func setupExtensionHooks(hookManager *hook.Manager) {
-    ctx := context.Background()
+func setupExtensionHooks(logger *zap.Logger) *hook.BuiltinProcessor {
+    processor := hook.NewBuiltinProcessor(logger)
     
-    // Before install hook
-    hookManager.RegisterBuiltin(ctx, extension.HookTypeBeforeInstall, func(ctx context.Context, data interface{}) error {
-        hookData := data.(*hook.HookData)
-        
-        // Validate extension
-        if hookData.ExtensionName == "" {
+    processor.Register(extension.HookTypeBeforeInstall, func(ctx context.Context, data *hook.Data) error {
+        if data.ExtensionName == "" {
             return fmt.Errorf("extension name is required")
         }
         
-        fmt.Printf("Validating extension: %s\n", hookData.ExtensionName)
+        fmt.Printf("Validating extension: %s\n", data.ExtensionName)
         return nil
     })
     
-    // After install hook
-    hookManager.RegisterBuiltin(ctx, extension.HookTypeAfterInstall, func(ctx context.Context, data interface{}) error {
-        hookData := data.(*hook.HookData)
-        
-        // Log installation
-        fmt.Printf("Extension installed: %s\n", hookData.ExtensionName)
-        
-        // Update extension registry
-        return updateExtensionRegistry(hookData.ExtensionName)
+    processor.Register(extension.HookTypeAfterInstall, func(ctx context.Context, data *hook.Data) error {
+        fmt.Printf("Extension installed: %s\n", data.ExtensionName)
+        return updateExtensionRegistry(data.ExtensionName)
     })
+    
+    return processor
 }
 ```
 
@@ -264,16 +249,15 @@ func setupExtensionHooks(hookManager *hook.Manager) {
 
 Extensions are managed using XDG-based configuration directories:
 
-- **Config Directory**: `~/.config/tykctl/` (or `TYKCTL_CONFIG_DIR`)
-- **Extensions Directory**: `~/.config/tykctl/extensions/`
+- **Config Directory**: `~/.config/tykctl/` (passed to `NewInstaller`)
+- **Extensions Directory**: `$XDG_DATA_HOME/tykctl/extensions/` (defaults to `~/.local/share/tykctl/extensions/`)
 - **Cache Directory**: `~/.cache/tykctl/`
 
 ### Environment Variables
 
-- `TYKCTL_CONFIG_DIR` - Custom configuration directory
-- `TYKCTL_EXTENSIONS_DIR` - Custom extensions directory
+- `TYKCTL_CONFIG_DIR` - Custom configuration directory (if your application wires it into `NewInstaller`)
 - `GITHUB_TOKEN` - GitHub token for API access
-- `TYKCTL_GITHUB_TOKEN` - Tykctl-specific GitHub token
+- `XDG_DATA_HOME` - Base directory override for installed extension binaries
 
 ## Extension Structure
 
