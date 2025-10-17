@@ -12,8 +12,8 @@ import (
 
 // Define test event types
 const (
-	TestEventTypeAPICreate eventbus.EventType = "api.create"
-	TestEventTypeCommandStart eventbus.EventType = "command.start"
+	TestEventTypeAPICreate    EventType = "api.create"
+	TestEventTypeCommandStart EventType = "command.start"
 )
 
 func TestEventBus_Publish(t *testing.T) {
@@ -226,9 +226,9 @@ func TestEventBus_HandlerPriority(t *testing.T) {
 
 	// Create handlers with different priorities
 	handler1 := &BaseHandler{
-		name:     "handler1",
-		priority: 100,
-		timeout:  1 * time.Second,
+		name:      "handler1",
+		priority:  100,
+		timeout:   1 * time.Second,
 		canHandle: func(EventType) bool { return true },
 		handle: func(ctx context.Context, event *Event) error {
 			mu.Lock()
@@ -239,9 +239,9 @@ func TestEventBus_HandlerPriority(t *testing.T) {
 	}
 
 	handler2 := &BaseHandler{
-		name:     "handler2",
-		priority: 50,
-		timeout:  1 * time.Second,
+		name:      "handler2",
+		priority:  50,
+		timeout:   1 * time.Second,
 		canHandle: func(EventType) bool { return true },
 		handle: func(ctx context.Context, event *Event) error {
 			mu.Lock()

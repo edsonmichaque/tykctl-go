@@ -12,14 +12,40 @@ import (
 
 // Prompt represents an interactive prompt
 type Prompt struct {
-	terminal *terminal.Terminal
+	terminal   *terminal.Terminal
+	runProgram func(tea.Model) (tea.Model, error)
+}
+
+// Option configures a Prompt.
+type Option func(*Prompt)
+
+// WithProgramRunner overrides the function used to execute Bubble Tea programs.
+func WithProgramRunner(fn func(tea.Model) (tea.Model, error)) Option {
+	return func(p *Prompt) {
+		p.runProgram = fn
+	}
 }
 
 // New creates a new prompt instance
-func New() *Prompt {
-	return &Prompt{
+func New(opts ...Option) *Prompt {
+	p := &Prompt{
 		terminal: terminal.New(),
+		runProgram: func(model tea.Model) (tea.Model, error) {
+			return tea.NewProgram(model).Run()
+		},
 	}
+
+	for _, opt := range opts {
+		opt(p)
+	}
+
+	if p.runProgram == nil {
+		p.runProgram = func(model tea.Model) (tea.Model, error) {
+			return tea.NewProgram(model).Run()
+		}
+	}
+
+	return p
 }
 
 // AskString asks for a string input
@@ -29,13 +55,12 @@ func (p *Prompt) AskString(question string) (string, error) {
 		input:    "",
 		done:     false,
 	}
-	
-	program := tea.NewProgram(model)
-	result, err := program.Run()
+
+	result, err := p.runProgram(model)
 	if err != nil {
 		return "", fmt.Errorf("failed to get input: %w", err)
 	}
-	
+
 	model = result.(*inputModel)
 	return strings.TrimSpace(model.input), nil
 }
@@ -47,13 +72,12 @@ func (p *Prompt) AskStringWithDefault(question, defaultValue string) (string, er
 		input:    defaultValue,
 		done:     false,
 	}
-	
-	program := tea.NewProgram(model)
-	result, err := program.Run()
+
+	result, err := p.runProgram(model)
 	if err != nil {
 		return "", fmt.Errorf("failed to get input: %w", err)
 	}
-	
+
 	model = result.(*inputModel)
 	answer := strings.TrimSpace(model.input)
 	if answer == "" {
@@ -68,12 +92,12 @@ func (p *Prompt) AskInt(question string) (int, error) {
 	if err != nil {
 		return 0, NewInputFailedError(question, answer, err)
 	}
-	
+
 	value, err := strconv.Atoi(answer)
 	if err != nil {
 		return 0, NewInvalidNumberError(answer, question, err)
 	}
-	
+
 	return value, nil
 }
 
@@ -83,16 +107,16 @@ func (p *Prompt) AskIntWithDefault(question string, defaultValue int) (int, erro
 	if err != nil {
 		return 0, NewInputFailedError(question, answer, err)
 	}
-	
+
 	if answer == "" {
 		return defaultValue, nil
 	}
-	
+
 	value, err := strconv.Atoi(answer)
 	if err != nil {
 		return 0, NewInvalidNumberError(answer, question, err)
 	}
-	
+
 	return value, nil
 }
 
@@ -103,13 +127,12 @@ func (p *Prompt) AskBool(question string) (bool, error) {
 		choice:   -1, // -1 = no choice yet, 0 = no, 1 = yes
 		done:     false,
 	}
-	
-	program := tea.NewProgram(model)
-	result, err := program.Run()
+
+	result, err := p.runProgram(model)
 	if err != nil {
 		return false, fmt.Errorf("failed to get confirmation: %w", err)
 	}
-	
+
 	model = result.(*confirmModel)
 	return model.choice == 1, nil
 }
@@ -122,13 +145,12 @@ func (p *Prompt) AskBoolWithDefault(question string, defaultValue bool) (bool, e
 		defaultValue: defaultValue,
 		done:         false,
 	}
-	
-	program := tea.NewProgram(model)
-	result, err := program.Run()
+
+	result, err := p.runProgram(model)
 	if err != nil {
 		return false, fmt.Errorf("failed to get confirmation: %w", err)
 	}
-	
+
 	model = result.(*confirmModel)
 	if model.choice == -1 {
 		return defaultValue, nil
@@ -141,20 +163,19 @@ func (p *Prompt) AskSelect(question string, options []string) (string, error) {
 	if len(options) == 0 {
 		return "", NewNoOptionsError(question)
 	}
-	
+
 	model := &selectModel{
 		question: question,
 		options:  options,
 		choice:   0,
 		done:     false,
 	}
-	
-	program := tea.NewProgram(model)
-	result, err := program.Run()
+
+	result, err := p.runProgram(model)
 	if err != nil {
 		return "", NewInputFailedError(question, "", err)
 	}
-	
+
 	model = result.(*selectModel)
 	return model.options[model.choice], nil
 }
@@ -164,7 +185,7 @@ func (p *Prompt) AskMultiSelect(question string, options []string) ([]string, er
 	if len(options) == 0 {
 		return nil, NewNoOptionsError(question)
 	}
-	
+
 	model := &multiSelectModel{
 		question: question,
 		options:  options,
@@ -172,13 +193,12 @@ func (p *Prompt) AskMultiSelect(question string, options []string) ([]string, er
 		cursor:   0,
 		done:     false,
 	}
-	
-	program := tea.NewProgram(model)
-	result, err := program.Run()
+
+	result, err := p.runProgram(model)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get multi-select: %w", err)
 	}
-	
+
 	model = result.(*multiSelectModel)
 	var selected []string
 	for i, choice := range model.choices {
@@ -196,13 +216,12 @@ func (p *Prompt) AskPassword(question string) (string, error) {
 		input:    "",
 		done:     false,
 	}
-	
-	program := tea.NewProgram(model)
-	result, err := program.Run()
+
+	result, err := p.runProgram(model)
 	if err != nil {
 		return "", fmt.Errorf("failed to get password: %w", err)
 	}
-	
+
 	model = result.(*passwordModel)
 	return model.input, nil
 }
@@ -290,7 +309,7 @@ func (m *inputModel) View() string {
 	if m.done {
 		return ""
 	}
-	
+
 	style := lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 	return fmt.Sprintf("%s %s", style.Render("?"), m.question+" "+m.input+"_")
 }
@@ -335,20 +354,20 @@ func (m *confirmModel) View() string {
 	if m.done {
 		return ""
 	}
-	
+
 	style := lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 	yesStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 	noStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
-	
+
 	yes := "Yes"
 	no := "No"
-	
+
 	if m.choice == 1 {
 		yes = yesStyle.Render("Yes")
 	} else if m.choice == 0 {
 		no = noStyle.Render("No")
 	}
-	
+
 	return fmt.Sprintf("%s %s (%s/%s)", style.Render("?"), m.question, yes, no)
 }
 
@@ -390,13 +409,13 @@ func (m *selectModel) View() string {
 	if m.done {
 		return ""
 	}
-	
+
 	style := lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 	selectedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-	
+
 	var lines []string
 	lines = append(lines, fmt.Sprintf("%s %s", style.Render("?"), m.question))
-	
+
 	for i, option := range m.options {
 		if i == m.choice {
 			lines = append(lines, fmt.Sprintf("  %s %s", selectedStyle.Render(">"), option))
@@ -404,7 +423,7 @@ func (m *selectModel) View() string {
 			lines = append(lines, fmt.Sprintf("    %s", option))
 		}
 	}
-	
+
 	return strings.Join(lines, "\n")
 }
 
@@ -449,14 +468,14 @@ func (m *multiSelectModel) View() string {
 	if m.done {
 		return ""
 	}
-	
+
 	style := lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 	selectedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 	checkedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-	
+
 	var lines []string
 	lines = append(lines, fmt.Sprintf("%s %s", style.Render("?"), m.question))
-	
+
 	for i, option := range m.options {
 		var prefix string
 		if i == m.cursor {
@@ -464,17 +483,17 @@ func (m *multiSelectModel) View() string {
 		} else {
 			prefix = " "
 		}
-		
+
 		var checkbox string
 		if m.choices[i] {
 			checkbox = checkedStyle.Render("✓")
 		} else {
 			checkbox = " "
 		}
-		
+
 		lines = append(lines, fmt.Sprintf("  %s [%s] %s", prefix, checkbox, option))
 	}
-	
+
 	return strings.Join(lines, "\n")
 }
 
@@ -515,7 +534,7 @@ func (m *passwordModel) View() string {
 	if m.done {
 		return ""
 	}
-	
+
 	style := lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 	hidden := strings.Repeat("*", len(m.input))
 	return fmt.Sprintf("%s %s %s_", style.Render("?"), m.question, hidden)

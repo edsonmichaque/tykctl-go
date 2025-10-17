@@ -1,346 +1,257 @@
 package prompt
 
 import (
-	"bufio"
-	"strings"
+	"errors"
 	"testing"
 
-	"github.com/edsonmichaque/tykctl-go/terminal"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
+func newPromptWithHandlers(t *testing.T, handlers ...func(tea.Model)) *Prompt {
+	t.Helper()
+
+	var call int
+
+	return New(WithProgramRunner(func(model tea.Model) (tea.Model, error) {
+		if call < len(handlers) {
+			handlers[call](model)
+		}
+		call++
+
+		markModelComplete(model)
+		return model, nil
+	}))
+}
+
+func markModelComplete(model tea.Model) {
+	switch m := model.(type) {
+	case *inputModel:
+		m.done = true
+	case *confirmModel:
+		m.done = true
+	case *selectModel:
+		m.done = true
+	case *multiSelectModel:
+		m.done = true
+	case *passwordModel:
+		m.done = true
+	}
+}
+
 func TestNew(t *testing.T) {
-	prompt := New()
-	if prompt == nil {
-		t.Error("New() returned nil")
+	p := New()
+	if p == nil {
+		t.Fatal("expected prompt to be created")
 	}
-
-	if prompt.terminal == nil {
-		t.Error("Terminal should not be nil")
-	}
-
-	if prompt.reader == nil {
-		t.Error("Reader should not be nil")
+	if p.terminal == nil {
+		t.Fatal("expected terminal to be initialised")
 	}
 }
 
 func TestAskString(t *testing.T) {
-	// Create a prompt with a custom reader
-	prompt := &Prompt{
-		terminal: terminal.New(),
-		reader:   bufio.NewReader(strings.NewReader("test input\n")),
-	}
+	p := newPromptWithHandlers(t, func(model tea.Model) {
+		m := model.(*inputModel)
+		m.input = "test input"
+	})
 
-	result, err := prompt.AskString("Enter something: ")
+	result, err := p.AskString("Enter something")
 	if err != nil {
-		t.Errorf("AskString failed: %v", err)
+		t.Fatalf("AskString returned error: %v", err)
 	}
-
 	if result != "test input" {
-		t.Errorf("Expected 'test input', got '%s'", result)
+		t.Fatalf("expected 'test input', got %q", result)
 	}
 }
 
 func TestAskStringWithDefault(t *testing.T) {
-	// Test with default value
-	prompt := &Prompt{
-		terminal: terminal.New(),
-		reader:   bufio.NewReader(strings.NewReader("\n")), // Empty input
-	}
+	p := newPromptWithHandlers(t,
+		func(model tea.Model) {
+			// Simulate pressing enter without typing anything
+			_ = model.(*inputModel)
+		},
+		func(model tea.Model) {
+			m := model.(*inputModel)
+			m.input = "custom input"
+		},
+	)
 
-	result, err := prompt.AskStringWithDefault("Enter name", "default")
+	first, err := p.AskStringWithDefault("Enter name", "default")
 	if err != nil {
-		t.Errorf("AskStringWithDefault failed: %v", err)
+		t.Fatalf("AskStringWithDefault returned error: %v", err)
+	}
+	if first != "default" {
+		t.Fatalf("expected 'default', got %q", first)
 	}
 
-	if result != "default" {
-		t.Errorf("Expected 'default', got '%s'", result)
-	}
-
-	// Test with actual input
-	prompt.reader = bufio.NewReader(strings.NewReader("custom input\n"))
-	result, err = prompt.AskStringWithDefault("Enter name", "default")
+	second, err := p.AskStringWithDefault("Enter name", "default")
 	if err != nil {
-		t.Errorf("AskStringWithDefault failed: %v", err)
+		t.Fatalf("AskStringWithDefault returned error: %v", err)
 	}
-
-	if result != "custom input" {
-		t.Errorf("Expected 'custom input', got '%s'", result)
+	if second != "custom input" {
+		t.Fatalf("expected 'custom input', got %q", second)
 	}
 }
 
 func TestAskInt(t *testing.T) {
-	// Test valid integer
-	prompt := &Prompt{
-		terminal: terminal.New(),
-		reader:   bufio.NewReader(strings.NewReader("42\n")),
-	}
+	p := newPromptWithHandlers(t,
+		func(model tea.Model) {
+			m := model.(*inputModel)
+			m.input = "42"
+		},
+		func(model tea.Model) {
+			m := model.(*inputModel)
+			m.input = "not a number"
+		},
+	)
 
-	result, err := prompt.AskInt("Enter a number: ")
+	value, err := p.AskInt("Number?")
 	if err != nil {
-		t.Errorf("AskInt failed: %v", err)
+		t.Fatalf("AskInt returned error: %v", err)
+	}
+	if value != 42 {
+		t.Fatalf("expected 42, got %d", value)
 	}
 
-	if result != 42 {
-		t.Errorf("Expected 42, got %d", result)
-	}
-
-	// Test invalid integer
-	prompt.reader = bufio.NewReader(strings.NewReader("not a number\n"))
-	_, err = prompt.AskInt("Enter a number: ")
+	_, err = p.AskInt("Number?")
 	if err == nil {
-		t.Error("Expected error for invalid integer, got nil")
+		t.Fatal("expected error for invalid integer")
+	}
+	var inputErr *InputError
+	if !errors.As(err, &inputErr) {
+		t.Fatalf("expected InputError, got %T", err)
 	}
 }
 
 func TestAskIntWithDefault(t *testing.T) {
-	// Test with default value
-	prompt := &Prompt{
-		terminal: terminal.New(),
-		reader:   bufio.NewReader(strings.NewReader("\n")), // Empty input
-	}
+	p := newPromptWithHandlers(t,
+		func(model tea.Model) {
+			// simulate enter without input
+			_ = model.(*inputModel)
+		},
+		func(model tea.Model) {
+			m := model.(*inputModel)
+			m.input = "25"
+		},
+	)
 
-	result, err := prompt.AskIntWithDefault("Enter a number", 10)
+	value, err := p.AskIntWithDefault("Number?", 10)
 	if err != nil {
-		t.Errorf("AskIntWithDefault failed: %v", err)
+		t.Fatalf("AskIntWithDefault returned error: %v", err)
+	}
+	if value != 10 {
+		t.Fatalf("expected 10, got %d", value)
 	}
 
-	if result != 10 {
-		t.Errorf("Expected 10, got %d", result)
-	}
-
-	// Test with actual input
-	prompt.reader = bufio.NewReader(strings.NewReader("25\n"))
-	result, err = prompt.AskIntWithDefault("Enter a number", 10)
+	value, err = p.AskIntWithDefault("Number?", 10)
 	if err != nil {
-		t.Errorf("AskIntWithDefault failed: %v", err)
+		t.Fatalf("AskIntWithDefault returned error: %v", err)
 	}
-
-	if result != 25 {
-		t.Errorf("Expected 25, got %d", result)
+	if value != 25 {
+		t.Fatalf("expected 25, got %d", value)
 	}
 }
 
 func TestAskBool(t *testing.T) {
-	// Test yes
-	prompt := &Prompt{
-		terminal: terminal.New(),
-		reader:   bufio.NewReader(strings.NewReader("yes\n")),
-	}
-
-	result, err := prompt.AskBool("Continue? (y/n): ")
+	yesPrompt := newPromptWithHandlers(t, func(model tea.Model) {
+		m := model.(*confirmModel)
+		m.choice = 1
+	})
+	result, err := yesPrompt.AskBool("Continue?")
 	if err != nil {
-		t.Errorf("AskBool failed: %v", err)
+		t.Fatalf("AskBool returned error: %v", err)
 	}
-
 	if !result {
-		t.Error("Expected true, got false")
+		t.Fatal("expected true for affirmative response")
 	}
 
-	// Test no
-	prompt.reader = bufio.NewReader(strings.NewReader("no\n"))
-	result, err = prompt.AskBool("Continue? (y/n): ")
+	noPrompt := newPromptWithHandlers(t, func(model tea.Model) {
+		m := model.(*confirmModel)
+		m.choice = 0
+	})
+	result, err = noPrompt.AskBool("Continue?")
 	if err != nil {
-		t.Errorf("AskBool failed: %v", err)
+		t.Fatalf("AskBool returned error: %v", err)
 	}
-
 	if result {
-		t.Error("Expected false, got true")
-	}
-
-	// Test y
-	prompt.reader = bufio.NewReader(strings.NewReader("y\n"))
-	result, err = prompt.AskBool("Continue? (y/n): ")
-	if err != nil {
-		t.Errorf("AskBool failed: %v", err)
-	}
-
-	if !result {
-		t.Error("Expected true, got false")
-	}
-
-	// Test n
-	prompt.reader = bufio.NewReader(strings.NewReader("n\n"))
-	result, err = prompt.AskBool("Continue? (y/n): ")
-	if err != nil {
-		t.Errorf("AskBool failed: %v", err)
-	}
-
-	if result {
-		t.Error("Expected false, got true")
+		t.Fatal("expected false for negative response")
 	}
 }
 
 func TestAskBoolWithDefault(t *testing.T) {
-	// Test with default true
-	prompt := &Prompt{
-		terminal: terminal.New(),
-		reader:   bufio.NewReader(strings.NewReader("\n")), // Empty input
-	}
-
-	result, err := prompt.AskBoolWithDefault("Continue? (y/n)", true)
+	truePrompt := newPromptWithHandlers(t, func(model tea.Model) {
+		// leave choice unset to use default
+		_ = model.(*confirmModel)
+	})
+	result, err := truePrompt.AskBoolWithDefault("Continue?", true)
 	if err != nil {
-		t.Errorf("AskBoolWithDefault failed: %v", err)
+		t.Fatalf("AskBoolWithDefault returned error: %v", err)
 	}
-
 	if !result {
-		t.Error("Expected true, got false")
+		t.Fatal("expected true when default is true")
 	}
 
-	// Test with default false
-	prompt2 := &Prompt{
-		terminal: terminal.New(),
-		reader:   bufio.NewReader(strings.NewReader("\n")), // Empty input
-	}
-	result, err = prompt2.AskBoolWithDefault("Continue? (y/n)", false)
+	falsePrompt := newPromptWithHandlers(t, func(model tea.Model) {
+		_ = model.(*confirmModel)
+	})
+	result, err = falsePrompt.AskBoolWithDefault("Continue?", false)
 	if err != nil {
-		t.Errorf("AskBoolWithDefault failed: %v", err)
+		t.Fatalf("AskBoolWithDefault returned error: %v", err)
 	}
-
 	if result {
-		t.Error("Expected false, got true")
+		t.Fatal("expected false when default is false")
 	}
 }
 
 func TestAskSelect(t *testing.T) {
-	choices := []string{"option1", "option2", "option3"}
+	p := newPromptWithHandlers(t, func(model tea.Model) {
+		m := model.(*selectModel)
+		m.choice = 2
+	})
 
-	// Test valid choice
-	prompt := &Prompt{
-		terminal: terminal.New(),
-		reader:   bufio.NewReader(strings.NewReader("2\n")),
-	}
-
-	result, err := prompt.AskSelect("Choose an option", choices)
+	result, err := p.AskSelect("Pick one", []string{"a", "b", "c"})
 	if err != nil {
-		t.Errorf("AskSelect failed: %v", err)
+		t.Fatalf("AskSelect returned error: %v", err)
 	}
-
-	if result != "option2" {
-		t.Errorf("Expected 'option2', got '%s'", result)
-	}
-
-	// Test invalid choice
-	prompt.reader = bufio.NewReader(strings.NewReader("invalid\n"))
-	_, err = prompt.AskSelect("Choose an option", choices)
-	if err == nil {
-		t.Error("Expected error for invalid choice, got nil")
+	if result != "c" {
+		t.Fatalf("expected 'c', got %q", result)
 	}
 }
 
-func TestAskSelectWithDefault(t *testing.T) {
-	choices := []string{"option1", "option2", "option3"}
-
-	// Test with default
-	prompt := &Prompt{
-		terminal: terminal.New(),
-		reader:   bufio.NewReader(strings.NewReader("1\n")), // Choose first option
+func TestAskSelect_NoOptions(t *testing.T) {
+	p := New()
+	_, err := p.AskSelect("Pick one", nil)
+	if err == nil {
+		t.Fatal("expected error when no options provided")
 	}
+}
 
-	result, err := prompt.AskSelect("Choose an option", choices)
+func TestAskMultiSelect(t *testing.T) {
+	p := newPromptWithHandlers(t, func(model tea.Model) {
+		m := model.(*multiSelectModel)
+		m.choices[0] = true
+		m.choices[2] = true
+	})
+
+	result, err := p.AskMultiSelect("Pick any", []string{"a", "b", "c"})
 	if err != nil {
-		t.Errorf("AskSelect failed: %v", err)
+		t.Fatalf("AskMultiSelect returned error: %v", err)
 	}
-
-	if result != "option1" {
-		t.Errorf("Expected 'option1', got '%s'", result)
-	}
-
-	// Test with actual input
-	prompt.reader = bufio.NewReader(strings.NewReader("3\n"))
-	result, err = prompt.AskSelect("Choose an option", choices)
-	if err != nil {
-		t.Errorf("AskSelect failed: %v", err)
-	}
-
-	if result != "option3" {
-		t.Errorf("Expected 'option3', got '%s'", result)
+	if len(result) != 2 || result[0] != "a" || result[1] != "c" {
+		t.Fatalf("expected selections [a c], got %v", result)
 	}
 }
 
 func TestAskPassword(t *testing.T) {
-	// This is hard to test without mocking os.Stdin
-	// We'll just test that it doesn't panic
-	prompt := New()
+	p := newPromptWithHandlers(t, func(model tea.Model) {
+		m := model.(*passwordModel)
+		m.input = "secret"
+	})
 
-	// Create a mock reader that simulates password input
-	prompt.reader = bufio.NewReader(strings.NewReader("secretpassword\n"))
-
-	result, err := prompt.AskPassword("Enter password: ")
+	result, err := p.AskPassword("Enter password")
 	if err != nil {
-		t.Errorf("AskPassword failed: %v", err)
+		t.Fatalf("AskPassword returned error: %v", err)
 	}
-
-	if result != "secretpassword" {
-		t.Errorf("Expected 'secretpassword', got '%s'", result)
-	}
-}
-
-func TestAskBoolConfirmation(t *testing.T) {
-	// Test confirmation
-	prompt := &Prompt{
-		terminal: terminal.New(),
-		reader:   bufio.NewReader(strings.NewReader("yes\n")),
-	}
-
-	result, err := prompt.AskBool("Are you sure?")
-	if err != nil {
-		t.Errorf("AskBool failed: %v", err)
-	}
-
-	if !result {
-		t.Error("Expected true, got false")
-	}
-
-	// Test rejection
-	prompt.reader = bufio.NewReader(strings.NewReader("no\n"))
-	result, err = prompt.AskBool("Are you sure?")
-	if err != nil {
-		t.Errorf("AskBool failed: %v", err)
-	}
-
-	if result {
-		t.Error("Expected false, got true")
-	}
-}
-
-// Benchmark tests
-func BenchmarkNew(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		prompt := New()
-		_ = prompt
-	}
-}
-
-func BenchmarkAskString(b *testing.B) {
-	prompt := &Prompt{
-		terminal: terminal.New(),
-		reader:   bufio.NewReader(strings.NewReader("test input\n")),
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		prompt.reader = bufio.NewReader(strings.NewReader("test input\n"))
-		result, err := prompt.AskString("Enter something: ")
-		if err != nil {
-			b.Fatalf("AskString failed: %v", err)
-		}
-		_ = result
-	}
-}
-
-func BenchmarkAskInt(b *testing.B) {
-	prompt := &Prompt{
-		terminal: terminal.New(),
-		reader:   bufio.NewReader(strings.NewReader("42\n")),
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		prompt.reader = bufio.NewReader(strings.NewReader("42\n"))
-		result, err := prompt.AskInt("Enter a number: ")
-		if err != nil {
-			b.Fatalf("AskInt failed: %v", err)
-		}
-		_ = result
+	if result != "secret" {
+		t.Fatalf("expected 'secret', got %q", result)
 	}
 }
